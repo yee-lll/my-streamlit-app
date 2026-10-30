@@ -7,66 +7,89 @@ from openai import OpenAI
 client = OpenAI()
 
 # 페이지 설정
-st.set_page_config(page_title="OpenAI 챗봇", page_icon="🤖")
-st.title("🤖 OpenAI API 챗봇")
-st.write("Streamlit + OpenAI API 실습 예제")
+st.set_page_config(page_title="한글 → 영어 번역기", page_icon="🤖")
+st.title("🤖 한글 → 영어 번역기")
+st.write("입력한 한글 문장을 자연스러운 영어로 번역합니다.")
 
-# 세션 상태 초기화
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant",
-                                  "content": "안녕하세요. 무엇을 도와드릴까요?"}]
+# 사용자 입력(텍스트)
+korean_text = st.text_area(
+    "번역할 한글 문장을 입력하세요.",
+    height=150,
+    placeholder="예: 인공지능은 우리의 일상과 업무 방식을 빠르게 변화시키고 있습니다."
+)
 
-# 기존 대화 출력
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# 번역 버튼
+if st.button("번역하기"):
 
-# 사용자 입력
-user_input = st.chat_input("메시지를 입력하세요...")
+    if not korean_text.strip():
+        st.warning("번역할 한글 문장을 입력하세요.")
+    else:
+        with st.spinner("번역 중입니다..."):
 
-if user_input:
-    # 사용자 메시지 저장 및 출력
-    st.session_state.messages.append(
-        {"role": "user", "content": user_input}
-    )
-    with st.chat_message("user"):
-        st.markdown(user_input)
+            # 시스템 역할
+            sys_role = """
+            당신은 한국어를 자연스러운 영어로 번역하는 전문 번역가입니다.
+            의미를 유지하면서 원어민이 쓰는 표현으로 번역합니다.
+            """
 
-    # 모델 응답 생성
-    try:
-        response = client.responses.create(
-            model="gpt-4.1-mini",
-            input=st.session_state.messages
-        )
-        assistant_reply = response.output_text
-    except Exception as e:
-        assistant_reply = f"오류가 발생했습니다: {e}"
+            # 프롬프트 구성
+            prompt = f"""
+            다음 문장을 영어로 번역하세요.
+            TEXT:
+            {korean_text}
+            """
 
-    # 응답 저장 및 출력
-    st.session_state.messages.append(
-        {"role": "assistant", "content": assistant_reply}
-    )
-    with st.chat_message("assistant"):
-        st.markdown(assistant_reply)
+            # GPT 호출
+            response = client.responses.create(
+                model="gpt-4o-mini",
+                input=[
+                    {"role": "system", "content": sys_role},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+
+            # 결과 출력
+            translated_text = response.output_text
+
+            st.subheader("번역 결과")
+            st.success(translated_text)
 
 
 
-# # 사용자 질문
-# prompt = st.text_input("질문을 입력하세요")
 
-# # 질문 버튼
-# if st.button("질문하기"):
-#     if prompt.strip() == "":
-#         st.warning("질문을 입력하세요")
+# %%writefile app.py
+
+# import os
+# import base64
+# import streamlit as st
+# from openai import OpenAI
+
+# # OpenAI 클라이언트 생성
+# client =
+
+# # 페이지 설정
+# st.set_page_config(     )
+# st.title(     )
+
+# # 텍스트 입력
+# text = st.text_area(
+#     "읽을 텍스트를 입력하세요",
+#     "안녕하세요. OpenAI 텍스트 음성 변환 실습입니다."
+# )
+
+# # 버튼
+# if st.button(      ):
+#     if text.strip() == "":
+#         st.warning(      )
 #     else:
-#          with st.spinner("답변 생성 중입니다..."):
-#             # LLM 호출
-#             response = client.responses.create(
-#                 model="gpt-4o-mini",
-#                 input=[{"role": "user", "content": prompt}]
-#             )
-#             answer = response.output_text
+#         # TTS 생성
+#         speech = client.audio.speech.create(
+#             model=     ,
+#             voice=     ,
+#             input=
+#         )
+#         audio_bytes =
 
-#             # 결과 출력
-#             st.subheader("AI 답변")
-#             st.write(answer)
+#         # 음성 출력
+#         st.markdown("### 🔊 음성 재생")
+#         st.audio(speech.content, format="audio/mp3")
