@@ -379,7 +379,8 @@ def analyze_meeting(transcript, my_name, meeting_date=None):
 실제 회의 날짜는 {meeting_date}입니다. 상대 날짜는 이 날짜 기준으로 해석하세요.
 불명확한 날짜·시간은 빈 문자열, 모르는 담당자는 '담당자 확인 필요'로 남기세요.
 화자 라벨만 있는 경우 실명을 추정하지 말고 라벨을 유지하세요.
-evidence에는 해당 업무나 일정을 뒷받침하는 원문 발언을 그대로 넣으세요.
+evidence는 선택 참고 항목입니다. 원문에서 짧은 발언을 찾을 수 있으면 넣고, 없으면 빈 문자열로 두세요.
+참고 발언을 채우기 위해 인용문을 만들지 말고 업무·담당자·날짜 추출에 집중하세요.
 반드시 코드펜스 없는 다음 JSON 객체를 출력하세요. 없는 항목은 빈 목록으로 둡니다.
 {{
  "summary":"핵심 요약", "decisions":["결정 사항"],
@@ -397,10 +398,16 @@ evidence에는 해당 업무나 일정을 뒷받침하는 원문 발언을 그�
         text={"format":{"type":"json_object"}}
     )
     result = load_json_answer(response.output_text)
+    # 참고 발언은 선택 항목입니다. 누락·표현 차이로 분석 전체를 중단하지 않습니다.
+    # Markdown 강조 표시와 공백·줄바꿈 차이는 무시하고 확인합니다.
+    normalized_original = re.sub(r"[\s*`_#]+", "", transcript)
     for item in result["tasks"] + result["events"]:
-        evidence = item.get("evidence", "")
-        if not isinstance(evidence, str) or not evidence.strip() or evidence not in transcript:
-            raise ValueError("원문에서 근거 발언을 찾을 수 없습니다. 분석을 다시 요청하세요.")
+        evidence = item.get("evidence")
+        evidence = evidence.strip() if isinstance(evidence, str) else ""
+        normalized_evidence = re.sub(r"[\s*`_#]+", "", evidence)
+        matched = bool(normalized_evidence) and normalized_evidence in normalized_original
+        item["evidence"] = evidence if matched else ""
+        item["evidence_status"] = "matched" if matched else "missing_or_unmatched"
     return result
 
 
@@ -457,12 +464,20 @@ APP_CSS = """
 [data-testid="stToolbar"]{display:none}
 [data-testid="stSidebar"]{background:#fff;border-right:1px solid var(--line);min-width:244px;max-width:244px}
 [data-testid="stSidebarContent"]{padding-top:1rem}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:.2rem}
-[data-testid="stSidebar"] .stButton button{width:100%;justify-content:flex-start;text-align:left;border:0;background:transparent;color:#76869f;border-radius:11px;padding:10px 13px;min-height:42px;font-weight:500}
+/* 메뉴 그룹은 Streamlit의 정상 문서 흐름 안에서 배치합니다. */
+[data-testid="stSidebar"] [class*="st-key-navgroup_"]{gap:6px!important;padding:12px 0 0;margin:0;overflow:visible}
+[data-testid="stSidebar"] [class*="st-key-navgroup_"] [data-testid="stCaptionContainer"]{padding:0 10px 5px;margin:0;min-height:20px}
+[data-testid="stSidebar"] [class*="st-key-navgroup_"] [data-testid="stCaptionContainer"] p{font-size:10px!important;line-height:1.5!important;letter-spacing:1.1px;font-weight:800;color:#9eabc1;margin:0!important}
+[data-testid="stSidebar"] .st-key-navgroup_voice{padding-top:18px;margin-top:4px}
+[data-testid="stSidebar"] .stButton{width:100%;margin:0}
+[data-testid="stSidebar"] .stButton button{width:100%;height:auto;min-height:42px;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;text-align:left;border:0;background:transparent;color:#76869f;border-radius:11px;padding:10px 13px;font-weight:500;position:relative;transform:none}
+[data-testid="stSidebar"] .stButton button>div{width:100%;text-align:left}
+[data-testid="stSidebar"] .stButton button p{margin:0!important;font-size:13px!important;line-height:1.45!important;text-align:left;white-space:normal}
 [data-testid="stSidebar"] .stButton button[kind="primary"], [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]{background:#f1efff;color:#625afa;font-weight:700}
-[data-testid="stSidebar"] .stButton button:hover{background:#f6f5ff;color:#625afa}
-.brand{display:flex;align-items:center;gap:10px;padding:5px 5px 27px}.brand-logo{display:grid;place-items:center;width:38px;height:39px;border-radius:13px;background:linear-gradient(130deg,#7769ff,#5050e6);color:#fff;font-size:24px;box-shadow:0 6px 16px #625afa33}
-.brand b{font-size:15px;letter-spacing:.3px}.brand small{display:block;color:#99a6bd;font-size:9px;line-height:1.4;letter-spacing:1.5px}.nav-label{font-size:10px;color:#9eabc1;font-weight:800;letter-spacing:1.1px;margin:20px 9px 6px}
+[data-testid="stSidebar"] .stButton button:hover{background:#f7f8fc;color:#625afa}
+[data-testid="stSidebar"] .stButton button[kind="primary"]:hover,[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover{background:#f1efff;color:#625afa}
+.brand{display:flex;align-items:center;gap:10px;padding:5px 5px 14px}.brand-logo{display:grid;place-items:center;width:38px;height:39px;border-radius:13px;background:linear-gradient(130deg,#7769ff,#5050e6);color:#fff;font-size:24px;box-shadow:0 6px 16px #625afa33}
+.brand b{font-size:15px;letter-spacing:.3px}.brand small{display:block;color:#99a6bd;font-size:9px;line-height:1.4;letter-spacing:1.5px}
 .side-note{border:1px solid #e6e3ff;background:#f8f7ff;padding:12px;border-radius:12px;margin-top:20px;color:#91a0b8;font-size:10px;line-height:1.8}.side-note b{color:#625afa;font-size:10px;letter-spacing:.4px}
 .topline{display:flex;justify-content:space-between;align-items:center;margin:0 0 22px}.eyebrow{font-size:11px;color:#97a5bc;letter-spacing:.25px;margin-bottom:5px}.topline h1{font-size:25px!important;color:#1e2b43;margin:0;padding:0;letter-spacing:-.7px;line-height:1.4}.topright{display:flex;align-items:center;gap:12px}.mode-tag{font-size:10px;background:#f0edff;color:#625afa;padding:6px 10px;border-radius:15px;font-weight:800}.avatar{height:34px;width:34px;background:#1e2c50;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800}
 h2{font-size:19px!important;letter-spacing:-.45px}h3{font-size:15px!important;letter-spacing:-.2px}p,li{font-size:13px;line-height:1.8}label p{font-size:12px!important}.stCaption p{font-size:11px;color:#95a3b9}
@@ -731,12 +746,15 @@ with st.sidebar:
     st.markdown('<div class="brand"><span class="brand-logo">✦</span><div><b>AI WORK MATE</b><small>SMART WORK<br>ASSISTANT</small></div></div>', unsafe_allow_html=True)
     groups = [("WORKSPACE",[("home","▦  홈 대시보드"),("chat","✧  AI 비서와 대화")]),("MEETINGS",[("meeting","♩  회의 분석하기"),("archive","▤  회의록 보관함")]),("PRODUCTIVITY",[("calendar","▦  스마트 캘린더"),("todo","☑  To-Do 리스트"),("briefing","☀  아침 업무 브리핑")]),("TOOLS",[("email","✉  이메일 관리"),("docs","▧  문서 검색"),("settings","⚙  환경설정")])]
     for label, menus in groups:
-        st.markdown(f'<div class="nav-label">{label}</div>', unsafe_allow_html=True)
-        for code, name in menus:
-            if st.button(name,key="nav_"+code,type="primary" if st.session_state.page==code else "secondary",use_container_width=True):
-                navigate(code)
-    st.markdown('<div class="nav-label">ABLE ASSISTANT</div>', unsafe_allow_html=True)
-    voice_event = wake_component(key="able_wake_widget",data={"stage":st.session_state.wake_stage,"reply":st.session_state.wake_reply,"replyId":st.session_state.wake_reply_id,"speak":st.session_state.speak_wake},on_submit_change=lambda:None)
+        # 제목과 버튼을 같은 그룹 안에 두어 간격이 겹치지 않게 합니다.
+        with st.container(key="navgroup_" + label.lower()):
+            st.caption(label)
+            for code, name in menus:
+                if st.button(name,key="nav_"+code,type="primary" if st.session_state.page==code else "secondary",use_container_width=True):
+                    navigate(code)
+    with st.container(key="navgroup_voice"):
+        st.caption("ABLE ASSISTANT")
+        voice_event = wake_component(key="able_wake_widget",data={"stage":st.session_state.wake_stage,"reply":st.session_state.wake_reply,"replyId":st.session_state.wake_reply_id,"speak":st.session_state.speak_wake},on_submit_change=lambda:None)
     st.markdown('<div class="side-note"><b>● FROM MEETING TO ACTION</b><br>회의에서 나온 일이 오늘의 실행으로 이어집니다.</div>', unsafe_allow_html=True)
 
 page = st.session_state.page
@@ -846,7 +864,7 @@ elif page == "meeting":
                 st.info(result["summary"])
                 for item in result["decisions"]:st.write("•",item)
                 st.markdown('### ④ 추출된 업무·일정 검토')
-                st.caption("담당자와 기한, 근거 발언을 확인한 뒤 등록해 주세요.")
+                st.caption("담당자와 기한을 확인한 뒤 등록해 주세요. 참고 발언은 있는 경우에만 표시합니다.")
                 labels=sorted({str(task.get("assignee", "")) for task in result["tasks"] if str(task.get("assignee", "")).startswith("화자")})
                 my_speaker=st.selectbox("내 화자를 선택하세요",["이름을 직접 확인·수정"]+labels,key="speaker_mapping")
                 review_id=hashlib.sha256((json.dumps(pending,ensure_ascii=False,sort_keys=True)+my_speaker).encode()).hexdigest()[:12]
@@ -862,16 +880,18 @@ elif page == "meeting":
                         choices=["높음","보통","낮음"]
                         priority=c3.selectbox("중요도",choices,index=choices.index(task.get("priority")) if task.get("priority") in choices else 1,key=f"task_priority_{review_id}_{i}")
                         due_time=st.text_input("마감 시간 HH:MM",value=str(task.get("due_time") or ""),key=f"task_time_{review_id}_{i}")
-                        st.caption("근거: "+str(task.get("evidence", "")))
-                        if use:tasks.append({"title":title.strip(),"assignee":who.strip(),"due_date":due.strip(),"due_time":due_time.strip(),"priority":priority,"notes":str(task.get("notes", ""))+"\n근거: "+str(task.get("evidence", ""))})
+                        if task.get("evidence"):
+                            st.caption("참고 발언: "+task["evidence"])
+                        if use:tasks.append({"title":title.strip(),"assignee":who.strip(),"due_date":due.strip(),"due_time":due_time.strip(),"priority":priority,"notes":str(task.get("notes", ""))+("\n참고 발언: "+task["evidence"] if task.get("evidence") else "")})
                     for i,event in enumerate(result["events"]):
                         use=st.checkbox("📅 "+event["title"],value=True,key=f"event_use_{review_id}_{i}")
                         title=st.text_input("일정명",value=event["title"],key=f"event_title_{review_id}_{i}")
                         c1,c2=st.columns(2)
                         day=c1.text_input("일정 날짜 YYYY-MM-DD",value=str(event.get("event_date") or ""),key=f"event_day_{review_id}_{i}")
                         tm=c2.text_input("시간 HH:MM",value=str(event.get("event_time") or ""),key=f"event_time_{review_id}_{i}")
-                        st.caption("근거: "+str(event.get("evidence", "")))
-                        if use:events.append({"title":title.strip(),"event_date":day.strip(),"event_time":tm.strip(),"notes":str(event.get("notes", ""))+"\n근거: "+str(event.get("evidence", ""))})
+                        if event.get("evidence"):
+                            st.caption("참고 발언: "+event["evidence"])
+                        if use:events.append({"title":title.strip(),"event_date":day.strip(),"event_time":tm.strip(),"notes":str(event.get("notes", ""))+("\n참고 발언: "+event["evidence"] if event.get("evidence") else "")})
                     approve=st.form_submit_button("✓ 선택한 업무·일정 등록하기",type="primary",use_container_width=True)
                 if approve:
                     try:
