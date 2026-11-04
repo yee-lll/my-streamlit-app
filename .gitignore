@@ -1,6 +1,8 @@
 api_key.txt
-.streamlit/secrets.toml
 *.db
-*.db-*
-*.log
+*.db-shm
+*.db-wal
+.env
+.streamlit/secrets.toml
 __pycache__/
+*.pyc
