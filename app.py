@@ -637,7 +637,17 @@ h2{font-size:19px!important;letter-spacing:-.45px}h3{font-size:15px!important;le
 .login-hero{text-align:center}.login-hero img{width:135px}.login-hero p{color:#a093b5}
 [data-testid="stChatMessageAvatarUser"]{background:#eee8fb!important;color:#8d74bc!important}
 .meeting-overview thead th{background:#f5f2fc;width:auto}.meeting-overview th:first-child{width:85px}
+.meeting-overview.archive-tasks{table-layout:auto;width:100%}
+.meeting-overview.archive-tasks th:first-child,.meeting-overview.archive-tasks td:first-child{width:auto;white-space:normal;overflow-wrap:anywhere}
+.meeting-overview.archive-tasks th:not(:first-child),.meeting-overview.archive-tasks td:not(:first-child){width:1%;white-space:nowrap;overflow-wrap:normal;padding-left:10px;padding-right:10px}
+
 .st-key-card_meeting_input{padding:16px}.st-key-card_meeting_input [data-testid="stRadio"] label{font-size:11px}
+
+.st-key-floating_chat_panel [data-testid="stChatMessage"]{background:#fff;border:1px solid #e3e6f1;border-radius:12px;padding:10px;margin-bottom:9px;gap:9px}
+.st-key-floating_chat_panel [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]){background:#f6f5fb}
+.st-key-floating_chat_panel [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"],.st-key-floating_chat_panel [data-testid="stChatMessage"] p,.st-key-floating_chat_panel [data-testid="stChatMessage"] li,.st-key-floating_chat_panel [data-testid="stChatMessage"] strong,.st-key-floating_chat_panel [data-testid="stChatMessage"] code{font-size:12px!important;line-height:1.65!important}
+.st-key-floating_chat_panel [data-testid="stChatMessage"] h1,.st-key-floating_chat_panel [data-testid="stChatMessage"] h2,.st-key-floating_chat_panel [data-testid="stChatMessage"] h3,.st-key-floating_chat_panel [data-testid="stChatMessage"] h4{font-size:13px!important;line-height:1.5!important;margin:7px 0}
+.st-key-floating_chat_panel [data-testid="stChatMessage"] ul,.st-key-floating_chat_panel [data-testid="stChatMessage"] ol{padding-left:1.3em;margin:5px 0}
 </style>
 """
 
@@ -845,11 +855,11 @@ def show_meeting_script(meeting):
 # ============================================================
 # 5. '에이블' 호출과 브라우저 음성 인식 컴포넌트
 # ============================================================
-VOICE_HTML = """<div class="wake-box"><div class="wake-head">✦ 에이블 호출</div><div class="wake-buttons"><button class="start">🎙 마이크 켜기</button><button class="stop">중지</button></div><button class="send" disabled>말한 내용 보내기</button><div class="status">마이크를 켠 뒤 ‘에이블’이라고 불러주세요.</div><div class="heard"></div></div>"""
+VOICE_HTML = """<div class="wake-box"><div class="wake-head">✦ 에이블 호출</div><div class="wake-buttons"><button class="start">🎙 마이크 켜기</button><button class="stop">마이크 중지</button></div><button class="send" disabled>말한 내용 보내기</button><div class="status">마이크를 켠 뒤 ‘에이블’이라고 불러주세요.</div><div class="heard"></div></div>"""
 VOICE_CSS = """.wake-box{background:#f7f6ff;border:1px solid #e7e3ff;border-radius:13px;padding:12px;font-family:inherit}.wake-head{font-size:12px;font-weight:800;color:#5c54df;margin-bottom:10px}.wake-buttons{display:flex;gap:6px}.wake-buttons button,.wake-box>.send{border:1px solid #e0dcfa;background:white;color:#6a62d8;border-radius:8px;padding:8px;font-size:10px;cursor:pointer}.wake-buttons .start{background:#625afa;color:white;border-color:#625afa;flex:1}.wake-box>.send{width:100%;margin-top:7px}.wake-box>.send:disabled{opacity:.45;cursor:default}.status{font-size:10px;line-height:1.8;color:#8e9cba;margin-top:9px}.heard{font-size:10px;color:#6c7399;max-height:110px;overflow:auto;margin-top:4px}"""
 VOICE_JS = r"""
 export default function(component) {
-  const root=component.parentElement.querySelector('.wake-box'), version='integrated-voice-3';
+  const root=component.parentElement.querySelector('.wake-box'), version='integrated-voice-5';
   const previous=root._ableVoice||window._workMateAbleVoice;
   if(previous?.root===root&&previous.version===version){previous.update(component);return previous.dispose}
   previous?.dispose();
@@ -859,18 +869,30 @@ export default function(component) {
   const synth=window.speechSynthesis, storeKey='wm-able-listening', quietMs=2200;
   const wakePattern=/에\s*이\s*[블불브](?:[아야](?=\s|[,.!?~]|$))?/;
   let data={}, submit=component.setTriggerValue, alive=true, report=component.setStateValue;
-  let voiceStatus='', replyAudio=null;
+  let voiceStatus='', replyAudio=null, draftTimer=null, lastDraft='', lastDraftAt=0, directCapture=false;
   let recognition=null, timer=null, speechTimer=null, quietTimer=null;
   let busy=false, speaking=false, utterance=null, networkErrors=0;
   let finalBuffer='', liveText='', hasPartial=false;
   let lastReplyId=sessionStorage.getItem('wm-able-last-reply')||'';
   const join=(...parts)=>parts.map(t=>String(t||'').trim()).filter(Boolean).join(' ');
+  function chatIsActive(){
+    const panel=document.querySelector('.st-key-floating_chat_panel');
+    return Boolean(data.chatFocused||(panel&&panel.getClientRects().length));
+  }
+  function publishDraft(force=false){
+    const text=liveText.trim();
+    if(text===lastDraft)return;
+    if(text&&data.stage!=='question'&&!directCapture&&!chatIsActive()&&!wakePattern.test(text))return;
+    clearTimeout(draftTimer);
+    const send=()=>{if(!alive)return;lastDraft=text;lastDraftAt=Date.now();report('voice_draft',text);};
+    if(force||Date.now()-lastDraftAt>=450)send();else draftTimer=setTimeout(send,450);
+  }
   function enabled(){return alive&&sessionStorage.getItem(storeKey)==='yes'&&data.stage!=='off'}
   function showHeard(){
     heard.textContent=liveText?'인식: '+liveText:'';
     sendButton.disabled=!enabled()||busy||speaking||!liveText.trim();
   }
-  function clearDraft(){clearTimeout(quietTimer);finalBuffer='';liveText='';hasPartial=false;showHeard()}
+  function clearDraft(){clearTimeout(quietTimer);clearTimeout(draftTimer);finalBuffer='';liveText='';hasPartial=false;directCapture=false;publishDraft(true);showHeard()}
   function stopRecognition(){
     clearTimeout(timer);timer=null;
     if(recognition){
@@ -894,18 +916,20 @@ export default function(component) {
     if(!enabled()||busy||speaking)return;
     let text=(manual?liveText:finalBuffer).trim();
     if(!text)return;
-    if(data.stage!=='question'){
+    const direct=directCapture||chatIsActive();
+    if(data.stage!=='question'&&!direct){
       const wake=text.match(wakePattern);
       if(!wake){status.textContent='호출어를 확인하지 못했어요. “에이블”부터 다시 말하거나 AI 대화의 녹음 입력을 사용해 주세요.';return}
       text=text.slice(wake.index).trim();
     }
     busy=true;stopRecognition();showHeard();status.textContent='에이블이 요청을 확인하고 있어요…';
-    submit('submit',{id:String(Date.now())+Math.random(),text,source:'voice'});
+    publishDraft(true);
+    submit('submit',{id:String(Date.now())+Math.random(),text,source:'voice',direct});
   }
   function waitForPause(){
     clearTimeout(quietTimer);
     if(!enabled()||busy||speaking||hasPartial||!finalBuffer.trim())return;
-    if(data.stage==='question'||wakePattern.test(finalBuffer)){
+    if(data.stage==='question'||directCapture||chatIsActive()||wakePattern.test(finalBuffer)){
       status.textContent='계속 듣고 있어요. 말을 마치면 잠시 후 전송합니다.';
       quietTimer=setTimeout(()=>sendRequest(),quietMs);
     }
@@ -922,7 +946,7 @@ export default function(component) {
       status.textContent=data.stage==='question'?'🎙 요청을 말씀해 주세요. 말할 때까지 계속 기다립니다.':'🎙 듣고 있어요. “에이블” 또는 “에이블, 오늘 일정 알려줘”라고 말씀해 주세요.';
       showHeard();
     };
-    r.onspeechstart=()=>{if(recognition===r)clearTimeout(quietTimer)};
+    r.onspeechstart=()=>{if(recognition===r){directCapture=chatIsActive();clearTimeout(quietTimer)}};
     r.onspeechend=()=>{if(recognition===r)waitForPause()};
     r.onresult=e=>{
       if(!alive||recognition!==r||busy||speaking)return;
@@ -933,7 +957,8 @@ export default function(component) {
         if(e.results[i].isFinal)finals=join(finals,t);else partial=join(partial,t);
       }
       finalBuffer=join(baseText,finals);liveText=join(finalBuffer,partial);hasPartial=Boolean(partial.trim());
-      networkErrors=0;showHeard();waitForPause();
+      directCapture=directCapture||chatIsActive();
+      networkErrors=0;showHeard();publishDraft(!hasPartial);waitForPause();
     };
     r.onerror=e=>{
       if(recognition!==r)return;
@@ -1006,11 +1031,15 @@ export default function(component) {
   function stop(){
     sessionStorage.removeItem(storeKey);busy=false;stopRecognition();stopSpeech();clearDraft();status.textContent='마이크를 중지했어요.';
   }
+  function stopReply(){
+    stopSpeech();showHeard();status.textContent='음성 답변을 멈췄어요.';scheduleListen();
+  }
   const controller={root,version,update,dispose};
   function dispose(){
     if(!alive)return;
     observer.disconnect();
-    alive=false;stopRecognition();stopSpeech();clearTimeout(quietTimer);
+    window.removeEventListener('able-stop-speech',stopReply);
+    alive=false;stopRecognition();stopSpeech();clearTimeout(quietTimer);clearTimeout(draftTimer);
     startButton.onclick=stopButton.onclick=sendButton.onclick=null;
     if(root._ableVoice===controller)delete root._ableVoice;
     if(window._workMateAbleVoice===controller)delete window._workMateAbleVoice;
@@ -1020,6 +1049,7 @@ export default function(component) {
     if(state!==voiceStatus){voiceStatus=state;report('voice_status',state);}
   });
   observer.observe(status,{childList:true,subtree:true,characterData:true});
+  window.addEventListener('able-stop-speech',stopReply);
   startButton.onclick=start;stopButton.onclick=stop;sendButton.onclick=()=>sendRequest(true);
   root._ableVoice=window._workMateAbleVoice=controller;update(component);
   return dispose;
@@ -1027,12 +1057,41 @@ export default function(component) {
 """
 wake_component = st.components.v2.component("work_mate_able_wake", html=VOICE_HTML, css=VOICE_CSS, js=VOICE_JS)
 
+SPEECH_STOP_JS = r'''
+export default function(component){
+ const root=component.parentElement.querySelector('.speech-stop-control');
+ const button=root.querySelector('button'), feedback=root.querySelector('.speech-feedback');
+ button.onclick=()=>{
+  window.dispatchEvent(new CustomEvent('able-stop-speech'));
+  window.speechSynthesis?.cancel();
+  document.querySelectorAll('audio').forEach(audio=>{
+   audio.pause();
+   try{audio.currentTime=0;}catch(e){}
+  });
+  feedback.textContent='음성 답변을 멈췄어요.';
+ };
+ return ()=>{button.onclick=null;};
+}
+'''
+SPEECH_STOP = st.components.v2.component(
+    "able_stop_spoken_reply",
+    html='<div class="speech-stop-control"><button type="button" title="대화와 마이크 대기는 유지하고 음성 답변만 멈춥니다">■ 음성 답변 멈추기</button><span class="speech-feedback" role="status" aria-live="polite"></span></div>',
+    css='.speech-stop-control{font-family:inherit;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:3px 0}.speech-stop-control button{font:inherit;font-size:12px;color:#7663b4;background:#faf8ff;border:1px solid #e6dff5;border-radius:9px;padding:8px 12px;cursor:pointer}.speech-stop-control button:hover{background:#f0eafa}.speech-feedback{font-size:11px;color:#8e83a6}',
+    js=SPEECH_STOP_JS,
+)
+
+
+def render_speech_stop(key):
+    SPEECH_STOP(data={},key=key)
 
 
 
 
 
-def process_able(text, source="text"):
+
+
+
+def process_able(text, source="text", direct=False):
     text = str(text).strip()
     if not text:
         return None
@@ -1042,7 +1101,7 @@ def process_able(text, source="text"):
     if source == "voice" and stage == "off":
         return None
     wake_pattern = r"에\s*이\s*[블불브](?:[아야](?=\s|[,.!?~]|$))?"
-    if source == "voice" and stage == "wake" and not re.search(wake_pattern, text):
+    if source == "voice" and stage == "wake" and not direct and not re.search(wake_pattern, text):
         return None
     command = re.sub(wake_pattern, "", text, count=1).strip(" ,.!?~")
     if re.sub(r"[\s,.!?~]", "", command) in ("종료", "그만", "잘가"):
@@ -1096,7 +1155,9 @@ def handle_voice_submit(item=None):
     event_id = str(item.get("id", ""))
     if event_id and event_id != st.session_state.get("last_voice_event"):
         st.session_state.last_voice_event = event_id
-        process_able(item.get("text", ""), "voice")
+        st.session_state.voice_draft = ""
+        st.session_state.clear_floating_query = True
+        process_able(item.get("text", ""), "voice", direct=item.get("direct") is True)
 
 
 
@@ -1366,8 +1427,8 @@ def employee_rows(content):
     return good, bad
 
 
-def table_html(headers, rows):
-    return '<table class="meeting-overview"><thead><tr>'+''.join('<th>'+esc(h)+'</th>' for h in headers)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+esc(v).replace('\n','<br>')+'</td>' for v in row)+'</tr>' for row in rows)+'</tbody></table>'
+def table_html(headers, rows, table_class="meeting-overview"):
+    return '<table class="'+esc(table_class)+'"><thead><tr>'+''.join('<th>'+esc(h)+'</th>' for h in headers)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+esc(v).replace('\n','<br>')+'</td>' for v in row)+'</tr>' for row in rows)+'</tbody></table>'
 
 
 def render_meeting_summary(data, meeting_date, key):
@@ -1397,6 +1458,23 @@ def analysis_mail(title, meeting_date, result, tasks):
     for task in tasks:
         lines.append(f"- {task['title']} / 담당: {task.get('assignee') or '확인 필요'} / 기한: {task.get('due_date') or '미정'} {task.get('due_time') or ''} / 중요도: {task.get('priority','보통')}")
     return {"subject":f"[회의 요약 및 담당 업무] {title}", "body":"\n".join(lines)}
+
+
+def send_analysis_to_self(title, meeting_date, result, tasks):
+    """분석 화면의 발송 버튼을 눌렀을 때 본인 Gmail로 바로 전송합니다."""
+    recipient = os.getenv("GMAIL_ADDRESS", "").strip()
+    if not valid_email(recipient):
+        return {"status":"failed", "error":"GMAIL_ADDRESS에 본인 Gmail 주소를 등록해 주세요."}
+    mine = [task for task in tasks if normalize_person_name(task.get("assignee")) == normalize_person_name(st.session_state.my_name)]
+    draft = analysis_mail(title, meeting_date, result, mine)
+    fingerprint = hashlib.sha256((recipient+"\0"+draft["subject"]+"\0"+draft["body"]).encode()).hexdigest()
+    sent = st.session_state.get("analysis_self_sent", [])
+    if fingerprint in sent:
+        return {"status":"already_sent", "to":recipient}
+    outcome = send_email(recipient, draft["subject"], draft["body"])
+    if outcome.get("status") == "success":
+        st.session_state.analysis_self_sent = sent + [fingerprint]
+    return {**outcome, "to":recipient}
 
 
 def prepare_self_email(title, meeting_date, result, tasks):
@@ -1487,13 +1565,18 @@ def render_floating_ai():
             with st.container(key="floating_chat_panel"):
                 st.markdown("### 에이블과의 대화")
                 st.caption("회의 내용과 업무를 여기서 바로 물어보세요.")
-                with st.container(height=290,border=False):
+                with st.container(height=290,border=False,autoscroll=True):
                     if not st.session_state.chat_history:
                         st.markdown(f'<div class="empty"><img src="{asset_uri("hello")}" width="95" alt="에이블"/><br>무엇을 도와드릴까요?</div>',unsafe_allow_html=True)
                     for message in st.session_state.chat_history[-30:]:
                         render_chat_message(message)
+                    if st.session_state.get("voice_draft"):
+                        with st.chat_message("user",avatar=":material/person:"):
+                            st.caption("음성 인식 중")
+                            st.write(st.session_state.voice_draft)
+                render_speech_stop("floating_speech_stop")
                 with st.form("floating_question",clear_on_submit=True):
-                    question = st.text_input("에이블에게 질문",placeholder="예: 오늘 먼저 할 일은?",label_visibility="collapsed")
+                    question = st.text_input("에이블에게 질문",placeholder="예: 오늘 먼저 할 일은?",label_visibility="collapsed",key="floating_query")
                     send = st.form_submit_button("에이블에게 물어보기",type="primary",use_container_width=True)
                 if send and question.strip():
                     with st.spinner("에이블이 생각하고 있어요…"):
@@ -1520,10 +1603,10 @@ export default function(component){
  if(root._text!==d.text){
   box.replaceChildren();
   const speakers=[];
-  String(d.text||'').split('\n').forEach((line,i)=>{
+  String(d.text||'').split(/\r\n|\r|\n/).forEach((line,i)=>{
    const row=document.createElement('div');row.className='speech-line';row.dataset.line=String(i);
    const match=line.match(/^(?:\[([^\]]+)\]\s*)?([^:：]{1,30})[:：]\s*(.*)$/);
-   const speaker=match?match[2]:'원문';
+   const speaker=match?match[2].trim():'원문';
    if(!speakers.includes(speaker))speakers.push(speaker);
    const badge=document.createElement('span');badge.className='speaker s'+(speakers.indexOf(speaker)%3);
    badge.textContent=match?speaker:'원문';
@@ -1768,11 +1851,28 @@ st.session_state.sidebar_pins = [x for x in st.session_state.sidebar_pins if x i
 if st.session_state.page not in MENU:
     st.session_state.page = "home"
 
+if st.session_state.pop("clear_floating_query",False):
+    st.session_state.floating_query = ""
+
 def handle_voice_status():
     value = st.session_state.get("able_wake_widget")
     value = value.get("voice_status") if value else None
     if value in ("idle","listening","thinking","speaking","off"):
         st.session_state.voice_ui = value
+
+def handle_voice_draft():
+    event = st.session_state.get("able_wake_widget", {})
+    draft = event.get("voice_draft") if event else None
+    if not isinstance(draft, str):
+        return
+    submitted = event.get("submit") if event else None
+    if isinstance(submitted, dict) and str(submitted.get("id", "")) == st.session_state.get("last_voice_event"):
+        draft = ""
+    previous = st.session_state.get("voice_draft", "")
+    st.session_state.voice_draft = draft
+    if draft or st.session_state.get("floating_query", "") == previous:
+        st.session_state.floating_query = draft
+
 
 with st.sidebar:
     st.markdown('<div class="brand"><span class="brand-logo">✦</span><div><b>AI WORK MATE</b><small>SMART WORK<br>ASSISTANT</small></div></div>',unsafe_allow_html=True)
@@ -1799,8 +1899,9 @@ with st.sidebar:
         render_voice_status()
         voice_event = wake_component(key="able_wake_widget",data={"stage":st.session_state.wake_stage,
             "reply":st.session_state.wake_reply,"replyId":st.session_state.wake_reply_id,"speak":st.session_state.speak_wake,
-            "audio":st.session_state.wake_audio,"rate":st.session_state.voice_speed},
-            on_submit_change=handle_voice_submit,on_voice_status_change=handle_voice_status)
+            "audio":st.session_state.wake_audio,"rate":st.session_state.voice_speed,"chatFocused":st.session_state.page=="chat"},
+            on_submit_change=handle_voice_submit,on_voice_status_change=handle_voice_status,on_voice_draft_change=handle_voice_draft)
+        render_speech_stop("sidebar_speech_stop")
     st.markdown('<div class="side-note"><b>FROM MEETING TO ACTION</b><br>회의에서 나온 일이 오늘의 실행으로 이어집니다.</div>',unsafe_allow_html=True)
     if st.button("로그아웃",key="able_logout",use_container_width=True):
         st.session_state.clear();st.rerun()
@@ -1964,8 +2065,15 @@ elif page == "meeting":
                 if saved_id:
                     st.success(f"회의록 #{saved_id} 저장 완료 · 보관함에서도 확인할 수 있어요.")
                 if st.button("✉ 회의 요약·내 담당 업무 나에게 보내기",key="meeting_self_"+analysis_id,use_container_width=True):
-                    prepare_self_email(pending["title"],pending["meeting_date"],result,tasks)
-                st.caption("메일 초안을 열어 수신자와 내용을 확인한 뒤 발송합니다.")
+                    with st.spinner("회의 요약과 내 담당 업무를 메일로 보내고 있어요…"):
+                        mail_result = send_analysis_to_self(pending["title"],pending["meeting_date"],result,tasks)
+                    if mail_result["status"] == "success":
+                        st.success(f"회의 요약과 내 담당 업무를 {mail_result['to']}로 발송했어요.")
+                    elif mail_result["status"] == "already_sent":
+                        st.info("같은 내용의 요약 메일은 이미 발송했어요.")
+                    else:
+                        st.error("이메일 발송 실패: "+mail_result.get("error","Gmail 설정을 확인해 주세요."))
+                st.caption("클릭하면 회의 요약과 선택한 내 담당 업무를 등록된 내 Gmail 주소로 바로 발송합니다.")
 
 
 elif page == "todo":
@@ -2121,6 +2229,11 @@ elif page == "chat":
                     st.session_state.wake_stage="wake";st.rerun()
             for item in st.session_state.chat_history:
                 render_chat_message(item)
+            if st.session_state.get("voice_draft"):
+                with st.chat_message("user",avatar=":material/person:"):
+                    st.caption("음성 인식 중")
+                    st.write(st.session_state.voice_draft)
+            render_speech_stop("chat_speech_stop")
             prompt=st.chat_input("예: 에이블, 오늘 가장 먼저 해야 할 일이 뭐야?")
             if prompt:
                 with st.spinner("에이블이 답변하고 있어요…"):process_able(prompt,"text")
@@ -2180,7 +2293,7 @@ elif page == "archive":
                 mine=[x for x in tasks if normalize_person_name(x.get("assignee"))==normalize_person_name(st.session_state.my_name)]
                 st.markdown("##### 내 담당 업무")
                 if mine:
-                    st.markdown(table_html(["업무","담당자","마감","중요도","상태"],[(t["title"],t["assignee"],(t.get("due_date") or "미정")+" "+(t.get("due_time") or ""),t["priority"],"완료" if t["done"] else "미완료") for t in mine]),unsafe_allow_html=True)
+                    st.markdown(table_html(["업무","담당자","마감","중요도","상태"],[(t["title"],t["assignee"],(t.get("due_date") or "미정")+" "+(t.get("due_time") or ""),t["priority"],"완료" if t["done"] else "미완료") for t in mine],table_class="meeting-overview archive-tasks"),unsafe_allow_html=True)
                 else:st.caption("저장된 내 담당 업무가 없습니다.")
                 st.markdown("##### 전체 스크립트")
                 render_full_transcript(m["transcript"],f"archive_{m['id']}",height=185)
