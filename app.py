@@ -64,42 +64,33 @@ FILE_TYPES = [
 
 # API 설정
 def load_settings():
+    # 환경변수 → 로컬 파일 → 데이터 폴더 파일 → Secrets 순으로 반영합니다.
+    # 일부 항목만 있는 파일이나 빈 Secrets가 다른 정상 설정을 지우지 않게 합니다.
     data = dict(os.environ)
-
-    for f in [DATA_DIR / "api_key.txt", Path("api_key.txt")]:
-        if f.exists():
-            for line in f.read_text(
-                encoding="utf-8-sig"
-            ).splitlines():
-
-                line = line.strip()
-
-                if not line or line.startswith("#"):
-                    continue
-
-                if "=" in line:
-                    k, v = line.split("=", 1)
-                    data[k.strip()] = (
-                        v.strip().strip('"').strip("'")
-                    )
-
-                elif line.startswith("sk-"):
-                    data["OPENAI_API_KEY"] = line
-
-            break
-
-    try:
-        for k in (
-            "OPENAI_API_KEY",
-            "GMAIL_ADDRESS",
-            "GMAIL_APP_PASSWORD",
-            "MAIL_TO"
-        ):
-            if k in st.secrets:
-                data[k] = st.secrets[k]
-    except Exception:
-        pass
-
+    seen = set()
+    for f in [Path("api_key.txt"), DATA_DIR / "api_key.txt"]:
+        identity = str(f.resolve())
+        if identity in seen or not f.is_file():
+            continue
+        seen.add(identity)
+        for line in f.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                value = value.strip().strip('"').strip("'")
+                if value:
+                    data[key.strip()] = value
+            elif line.startswith("sk-"):
+                data["OPENAI_API_KEY"] = line
+    for key in ["OPENAI_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "MAIL_TO",
+                "APP_LOGIN_ID", "APP_LOGIN_PASSWORD", "APP_LOGIN_PHONE", "APP_LOGIN_EMPLOYEE_NO"]:
+        try:
+            if key in st.secrets and str(st.secrets[key]).strip():
+                data[key] = str(st.secrets[key]).strip()
+        except Exception:
+            pass
     return data
 
 
@@ -198,7 +189,38 @@ def db():
     return conn
 
 
+def migrate_legacy_tasks():
+    """6차 수정본의 기존 DB 보완: 변경 전에 SQLite 백업을 만들고 누락된 열만 추가합니다."""
+    with db() as conn:
+        exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'").fetchone()
+        if not exists:
+            return
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
+        definitions = {"kind": "TEXT DEFAULT '업무'", "description": "TEXT DEFAULT ''", "reason": "TEXT DEFAULT ''"}
+        missing = {name: definition for name, definition in definitions.items() if name not in columns}
+        if not missing:
+            return
+        backup_path = DB_PATH.with_name(f"aivle_backup_{datetime.now():%Y%m%d_%H%M%S_%f}.db")
+        # backup()은 WAL의 변경도 포함해 일관된 사본을 만듭니다.
+        with sqlite3.connect(str(backup_path)) as backup:
+            conn.backup(backup)
+        with conn:
+            for name, definition in missing.items():
+                conn.execute(f"ALTER TABLE tasks ADD COLUMN {name} {definition}")
+        S.db_migration_backup = str(backup_path)
+        S.ui_notice = "기존 DB를 백업하고 누락된 열을 추가했습니다."
+
+
+def new_task_id(conn):
+    """기존 DB의 INTEGER 기본키와 5차 코드의 TEXT 기본키를 모두 지원합니다."""
+    id_column = next((row for row in conn.execute("PRAGMA table_info(tasks)") if row[1] == "id"), None)
+    if id_column and str(id_column[2]).upper().strip() == "INTEGER" and id_column[5]:
+        return None  # SQLite가 다음 숫자 ID를 생성합니다.
+    return uuid.uuid4().hex
+
+
 def init_db():
+    migrate_legacy_tasks()
     with db() as c:
         c.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
@@ -312,7 +334,7 @@ def upsert_tasks(items, meeting_id=None):
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                uuid.uuid4().hex,
+                new_task_id(c),
                 title,
                 owner,
                 due,
@@ -1430,7 +1452,7 @@ def save_meeting_changes(meeting_id, data):
                          sort_order, meeting_id)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        uuid.uuid4().hex,
+                        new_task_id(c),
                         title,
                         owner,
                         due,
@@ -2563,7 +2585,7 @@ def show_calendar(
         )
 
         events.append({
-            "id": t["id"],
+            "id": str(t["id"]),
             "title": t["title"],
             "start": start,
             "allDay": "T" not in start,
@@ -2616,7 +2638,7 @@ def show_calendar(
         x = next(
             (
                 t for t in tasks_all()
-                if t["id"] == S.selected_task
+                if str(t["id"]) == str(S.selected_task)
             ),
             None
         )
@@ -3356,7 +3378,7 @@ def render_tasks():
             checked = a.checkbox(
                 t["title"],
                 value=bool(t["done"]),
-                key="taskcheck_" + t["id"]
+                key="taskcheck_" + str(t["id"])
             )
 
             if checked != bool(t["done"]):
@@ -3370,7 +3392,7 @@ def render_tasks():
                 f"{t['owner']} · "
                 f"{t['due_date'] or '기한 미정'} "
                 f"{t['at_time'] or ''} · "
-                f"{t['kind']} · "
+                f"{t.get('kind', '업무')} · "
                 f"{t['priority']} 우선순위"
             )
 
@@ -3387,7 +3409,7 @@ def render_tasks():
                 "수정",
                 use_container_width=True
             ):
-                with st.form("edit_" + t["id"]):
+                with st.form("edit_" + str(t["id"])):
                     title = st.text_input(
                         "업무명",
                         value=t["title"]
@@ -3487,7 +3509,7 @@ def render_tasks():
 
                 if st.button(
                     "업무 삭제",
-                    key="del_" + t["id"]
+                    key="del_" + str(t["id"])
                 ):
                     remove_task(t["id"])
                     st.rerun()
@@ -3604,19 +3626,15 @@ def render_tasks():
                     )
 
                 st.rerun()
-APP_CSS = '\n<style>\n:root{--ink:#1e2b43;--muted:#65748b;--purple:#625afa;--line:#e7ecf5;--bg:#f6f8fc}\n.stApp{background:var(--bg);color:var(--ink)}\n.block-container{max-width:1420px;padding:1.5rem 2.7rem 3rem}\n[data-testid="stHeader"]{background:rgba(246,248,252,.96)}\n\n[data-testid="stSidebar"]{background:#fff;border-right:1px solid var(--line);min-width:256px;max-width:256px}\n[data-testid="stSidebarContent"]{padding-top:1rem}\n/* 메뉴 그룹은 Streamlit의 정상 문서 흐름 안에서 배치합니다. */\n[data-testid="stSidebar"] [class*="st-key-navgroup_"]{gap:6px!important;padding:12px 0 0;margin:0;overflow:visible}\n[data-testid="stSidebar"] [class*="st-key-navgroup_"] [data-testid="stCaptionContainer"]{padding:0 10px 5px;margin:0;min-height:20px}\n[data-testid="stSidebar"] [class*="st-key-navgroup_"] [data-testid="stCaptionContainer"] p{font-size:10px!important;line-height:1.5!important;letter-spacing:1.1px;font-weight:800;color:#65748b;margin:0!important}\n[data-testid="stSidebar"] .st-key-navgroup_voice{padding-top:18px;margin-top:4px}\n[data-testid="stSidebar"] .stButton{width:100%;margin:0}\n[data-testid="stSidebar"] .stButton button{width:100%;height:auto;min-height:42px;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;text-align:left;border:0;background:transparent;color:#65748b;border-radius:11px;padding:10px 13px;font-weight:500;position:relative;transform:none}\n[data-testid="stSidebar"] .stButton button>div{width:100%;text-align:left}\n[data-testid="stSidebar"] .stButton button p{margin:0!important;font-size:13px!important;line-height:1.45!important;text-align:left;white-space:normal}\n[data-testid="stSidebar"] .stButton button[kind="primary"], [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]{background:#f1efff;color:#625afa;font-weight:700}\n[data-testid="stSidebar"] .stButton button:hover{background:#f7f8fc;color:#625afa}\n[data-testid="stSidebar"] .stButton button[kind="primary"]:hover,[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover{background:#f1efff;color:#625afa}\n.brand{display:flex;align-items:center;gap:10px;padding:5px 5px 14px}.brand-logo{display:grid;place-items:center;width:38px;height:39px;border-radius:13px;background:linear-gradient(130deg,#7769ff,#5050e6);color:#fff;font-size:24px;box-shadow:0 6px 16px #625afa33}\n.brand b{font-size:15px;letter-spacing:.3px}.brand small{display:block;color:#99a6bd;font-size:9px;line-height:1.4;letter-spacing:1.5px}\n.side-note{border:1px solid #e6e3ff;background:#f8f7ff;padding:12px;border-radius:12px;margin-top:20px;color:#91a0b8;font-size:10px;line-height:1.8}.side-note b{color:#625afa;font-size:10px;letter-spacing:.4px}\n.topline{display:flex;justify-content:space-between;align-items:center;margin:0 0 22px}.eyebrow{font-size:11px;color:#97a5bc;letter-spacing:.25px;margin-bottom:5px}.topline h1{font-size:25px!important;color:#1e2b43;margin:0;padding:0;letter-spacing:-.7px;line-height:1.4}.topright{display:flex;align-items:center;gap:12px}.mode-tag{font-size:10px;background:#f0edff;color:#625afa;padding:6px 10px;border-radius:15px;font-weight:800}.avatar{height:34px;width:34px;background:#1e2c50;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800}\nh2{font-size:19px!important;letter-spacing:-.45px}h3{font-size:15px!important;letter-spacing:-.2px}p,li{font-size:14px;line-height:1.8}label p{font-size:12px!important}.stCaption p{font-size:11px;color:#65748b}\n.stButton button,[data-testid="stFormSubmitButton"] button{border-radius:10px;border-color:#dfe3f2;font-size:12px;font-weight:650;min-height:39px;box-shadow:none}\n.stButton button[kind="primary"],[data-testid="stFormSubmitButton"] button[kind="primary"]{background:#625afa;border-color:#625afa;color:white}\n.stButton button:hover{border-color:#857bff;color:#625afa}.stButton button[kind="primary"]:hover{background:#554de6;color:white}\n[data-baseweb="input"],[data-baseweb="textarea"],[data-baseweb="select"]>div{border-radius:10px;border-color:#e0e5f1;background:white}\n[data-testid="stRadio"] label{font-size:12px}\n[class*="st-key-card_"]{background:white;border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 8px 28px #26395704}\n[class*="st-key-card_"] [data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)}\n.st-key-hero{background:linear-gradient(115deg,#25385f,#353c80 64%,#514ac8);color:white;border-radius:19px;padding:28px;min-height:252px;position:relative;overflow:hidden}\n.st-key-hero h2{color:#fff!important;font-size:23px!important;line-height:1.45!important;letter-spacing:-.5px;margin:14px 0 9px}.st-key-hero p{color:#d7dcf4;font-size:12px}.st-key-hero button{background:white;border:0;color:#5b55e7;min-height:33px;padding:5px 10px}.hero-kicker{font-size:10px;color:#bfc9e8;font-weight:750;letter-spacing:.45px}.hero-copy{position:relative;z-index:1;width:78%}.hero-robot{position:absolute;width:142px;right:-10px;top:24px;opacity:.96;pointer-events:none}.hero-sub{font-size:12px;line-height:1.9;color:#d0d8ee;margin-top:8px}\n.recommend-label{font-size:14px;font-weight:800}.recommend-title{font-size:16px;font-weight:800;line-height:1.6;margin:31px 0}.recommend-meta{font-size:11px;color:#9ba8bc;line-height:1.8;margin-bottom:20px}\n.statrow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:18px 0}.stat-card{background:#fff;border:1px solid var(--line);padding:18px 21px;border-radius:18px;display:flex;justify-content:space-between;align-items:center}.stat-label{font-size:11px;color:#8a9ab4}.stat-value{font-size:27px;font-weight:800;line-height:1.5}.stat-icon{width:40px;height:40px;border-radius:12px;background:#f1efff;display:grid;place-items:center;font-size:22px}\n.note{background:#f3f4ff;border:1px solid #e2e5ff;color:#838fc0;border-radius:12px;padding:13px 15px;font-size:11px;line-height:1.9;margin-top:12px}.empty{text-align:center;padding:45px 10px;color:#65748b;font-size:14px;line-height:1.8}.section-label{font-size:15px;font-weight:800;color:#24314d;margin-bottom:12px}.tiny{font-size:11px;color:#65748b}.tag{display:inline-block;padding:5px 9px;font-size:10px;font-weight:750;border-radius:7px;white-space:nowrap}.urgent{color:#ed6a75;background:#fff0f1}.high{color:#d3954b;background:#fff4e7}.medium{color:#7786c4;background:#eef2ff}.done{color:#2aaa83;background:#eaf9f2}.strike{text-decoration:line-through;color:#a6b0c2}.task-title{font-size:12px;font-weight:750;margin-bottom:4px}.task-meta{font-size:10px;color:#65748b;line-height:1.8}.task-score{font-size:10px;color:#a090d5;margin-top:3px}.task-row{padding:11px 0}.row-line{height:1px;background:#eef1f7;margin:4px 0}.stCheckbox{padding-top:3px}.schedule-row{display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid #f0f2f7}.schedule-time{font-size:11px;font-weight:800;color:#7c70f9;min-width:42px}.schedule-content{border-left:3px solid #9d8bff;padding-left:14px}.schedule-title{font-size:12px;font-weight:750}.schedule-meta{font-size:10px;color:#65748b;margin-top:4px}\n.speech-line{display:flex;gap:12px;border-bottom:1px solid #edf0f6;padding:13px 0}.speaker{font-size:10px;font-weight:750;background:#eeeaff;color:#7162e4;border-radius:7px;padding:5px 8px;height:fit-content;white-space:nowrap}.speaker.s1{background:#e8f4ff;color:#5b9cc9}.speaker.s2{background:#e9f8f1;color:#44a37e}.speech-text{font-size:12px;color:#53617a;line-height:1.8}.speech-time{font-size:10px;color:#a5b0c4;margin-bottom:3px}\n.st-key-card_meeting_result{padding:23px}.st-key-card_meeting_input [data-testid="stFileUploader"]{background:#fbfbff;border:1px dashed #d4d4ef;padding:9px;border-radius:13px}.st-key-card_meeting_input [data-testid="stFileUploaderDropzone"]{background:transparent}\n.st-key-card_todo_list .stRadio>div{gap:6px}.st-key-card_todo_list [role="radiogroup"] label{background:#fff;border:1px solid #e3e6f1;border-radius:10px;padding:5px 10px}.st-key-card_todo_list [role="radiogroup"] label:has(input:checked){background:#625afa;color:#fff;border-color:#625afa}\n.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-left:1px solid #e8edf5;border-top:1px solid #e8edf5;margin-top:16px}.cal-head{padding:11px;text-align:center;color:#a1aec2;font-size:10px;border-right:1px solid #e8edf5;border-bottom:1px solid #e8edf5}.cal-cell{min-height:110px;padding:8px;border-right:1px solid #e8edf5;border-bottom:1px solid #e8edf5;overflow:hidden;min-width:0}.cal-cell.outside{background:#fafbfe}.cal-number{display:grid;place-items:center;width:25px;height:25px;font-size:10px;font-weight:750;color:#8595ae;margin-bottom:5px}.cal-number.today{background:#625afa;border-radius:50%;color:white}.cal-item{font-size:9px;padding:4px 5px;border-radius:5px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#f0edff;color:#7464ed}.cal-item.task{background:#fff2e7;color:#cc965f}.cal-item.finished{opacity:.55;text-decoration:line-through}.legend{font-size:11px;color:#98a5bb;margin:10px 0}\n.chat-welcome{display:flex;align-items:center;gap:22px;padding:12px 0 20px}.chat-welcome img{width:110px}.chat-welcome h2{margin-bottom:9px}.chat-welcome p{color:#93a1b9}.st-key-card_assistant [data-testid="stChatMessage"]{border-radius:14px;border:1px solid #eceef7;background:#fafbff}\n@media(max-width:900px){.block-container{padding:1.3rem 1rem}.statrow{grid-template-columns:repeat(2,1fr);gap:10px}.hero-robot{width:110px;opacity:.6}.hero-copy{width:90%}.cal-cell{min-height:82px;padding:4px}.cal-item{font-size:8px}.topline h1{font-size:21px!important}.topright{gap:5px}[class*="st-key-card_"]{padding:16px}}\n\n[data-testid="stSidebarCollapsedControl"]{visibility:visible!important;opacity:1!important}\n[data-testid="stDataFrame"]{border:1px solid #e0e5ef;border-radius:12px;overflow:hidden}\n[data-testid="stMetric"]{background:#f7f8fc;border:1px solid #e7ecf5;border-radius:12px;padding:14px}\n[data-testid="stMetricValue"]{font-size:25px;color:#26324b}\n[data-testid="stTabs"] [role="tab"]{font-size:14px;font-weight:650}\n[data-testid="stCaptionContainer"] p{color:#65748b}\n.st-key-hero{min-height:255px}.hero-robot{right:0;top:35px;width:135px}\n\n</style>\n'
+APP_CSS = '\n<style>\n:root{--ink:#1e2b43;--muted:#65748b;--purple:#625afa;--line:#e7ecf5;--bg:#f6f8fc}\n.stApp{background:var(--bg);color:var(--ink)}\n.block-container{max-width:1420px;padding:1.5rem 2.7rem 3rem}\n[data-testid="stHeader"]{background:rgba(246,248,252,.96)}\n\n[data-testid="stSidebar"]{background:#fff;border-right:1px solid var(--line);min-width:256px;max-width:256px}\n[data-testid="stSidebarContent"]{padding-top:1rem}\n/* 메뉴 그룹은 Streamlit의 정상 문서 흐름 안에서 배치합니다. */\n[data-testid="stSidebar"] [class*="st-key-navgroup_"]{gap:6px!important;padding:12px 0 0;margin:0;overflow:visible}\n[data-testid="stSidebar"] [class*="st-key-navgroup_"] [data-testid="stCaptionContainer"]{padding:0 10px 5px;margin:0;min-height:20px}\n[data-testid="stSidebar"] [class*="st-key-navgroup_"] [data-testid="stCaptionContainer"] p{font-size:10px!important;line-height:1.5!important;letter-spacing:1.1px;font-weight:800;color:#65748b;margin:0!important}\n[data-testid="stSidebar"] .st-key-navgroup_voice{padding-top:18px;margin-top:4px}\n[data-testid="stSidebar"] .stButton{width:100%;margin:0}\n[data-testid="stSidebar"] .stButton button{width:100%;height:auto;min-height:42px;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;text-align:left;border:0;background:transparent;color:#65748b;border-radius:11px;padding:10px 13px;font-weight:500;position:relative;transform:none}\n[data-testid="stSidebar"] .stButton button>div{width:100%;text-align:left}\n[data-testid="stSidebar"] .stButton button p{margin:0!important;font-size:13px!important;line-height:1.45!important;text-align:left;white-space:normal}\n[data-testid="stSidebar"] .stButton button[kind="primary"], [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]{background:#f1efff;color:#625afa;font-weight:700}\n[data-testid="stSidebar"] .stButton button:hover{background:#f7f8fc;color:#625afa}\n[data-testid="stSidebar"] .stButton button[kind="primary"]:hover,[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover{background:#f1efff;color:#625afa}\n.brand{display:flex;align-items:center;gap:10px;padding:5px 5px 14px}.brand-logo{display:grid;place-items:center;width:38px;height:39px;border-radius:13px;background:linear-gradient(130deg,#7769ff,#5050e6);color:#fff;font-size:24px;box-shadow:0 6px 16px #625afa33}\n.brand b{font-size:15px;letter-spacing:.3px}.brand small{display:block;color:#99a6bd;font-size:9px;line-height:1.4;letter-spacing:1.5px}\n.side-note{border:1px solid #e6e3ff;background:#f8f7ff;padding:12px;border-radius:12px;margin-top:20px;color:#91a0b8;font-size:10px;line-height:1.8}.side-note b{color:#625afa;font-size:10px;letter-spacing:.4px}\n.topline{display:flex;justify-content:space-between;align-items:center;margin:0 0 22px}.eyebrow{font-size:11px;color:#97a5bc;letter-spacing:.25px;margin-bottom:5px}.topline h1{font-size:25px!important;color:#1e2b43;margin:0;padding:0;letter-spacing:-.7px;line-height:1.4}.topright{display:flex;align-items:center;gap:12px}.mode-tag{font-size:10px;background:#f0edff;color:#625afa;padding:6px 10px;border-radius:15px;font-weight:800}.avatar{height:34px;width:34px;background:#1e2c50;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800}\nh2{font-size:19px!important;letter-spacing:-.45px}h3{font-size:15px!important;letter-spacing:-.2px}p,li{font-size:14px;line-height:1.8}label p{font-size:12px!important}.stCaption p{font-size:11px;color:#65748b}\n.stButton button,[data-testid="stFormSubmitButton"] button{border-radius:10px;border-color:#dfe3f2;font-size:12px;font-weight:650;min-height:39px;box-shadow:none}\n.stButton button[kind="primary"],[data-testid="stFormSubmitButton"] button[kind="primary"]{background:#625afa;border-color:#625afa;color:white}\n.stButton button:hover{border-color:#857bff;color:#625afa}.stButton button[kind="primary"]:hover{background:#554de6;color:white}\n[data-baseweb="input"],[data-baseweb="textarea"],[data-baseweb="select"]>div{border-radius:10px;border-color:#e0e5f1;background:white}\n[data-testid="stRadio"] label{font-size:12px}\n[class*="st-key-card_"]{background:white;border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 8px 28px #26395704}\n[class*="st-key-card_"] [data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)}\n.st-key-hero{background:linear-gradient(115deg,#25385f,#353c80 64%,#514ac8);color:white;border-radius:19px;padding:28px;min-height:252px;position:relative;overflow:hidden}\n.st-key-hero h2{color:#fff!important;font-size:23px!important;line-height:1.45!important;letter-spacing:-.5px;margin:14px 0 9px}.st-key-hero p{color:#d7dcf4;font-size:12px}.st-key-hero button{background:white;border:0;color:#5b55e7;min-height:33px;padding:5px 10px}.hero-kicker{font-size:10px;color:#bfc9e8;font-weight:750;letter-spacing:.45px}.hero-copy{position:relative;z-index:1;width:100%}.hero-sub{font-size:12px;line-height:1.9;color:#d0d8ee;margin-top:8px}\n.recommend-label{font-size:14px;font-weight:800}.recommend-title{font-size:16px;font-weight:800;line-height:1.6;margin:31px 0}.recommend-meta{font-size:11px;color:#9ba8bc;line-height:1.8;margin-bottom:20px}\n.statrow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:18px 0}.stat-card{background:#fff;border:1px solid var(--line);padding:18px 21px;border-radius:18px;display:flex;justify-content:space-between;align-items:center}.stat-label{font-size:11px;color:#8a9ab4}.stat-value{font-size:27px;font-weight:800;line-height:1.5}.stat-icon{width:40px;height:40px;border-radius:12px;background:#f1efff;display:grid;place-items:center;font-size:22px}\n.note{background:#f3f4ff;border:1px solid #e2e5ff;color:#838fc0;border-radius:12px;padding:13px 15px;font-size:11px;line-height:1.9;margin-top:12px}.empty{text-align:center;padding:45px 10px;color:#65748b;font-size:14px;line-height:1.8}.section-label{font-size:15px;font-weight:800;color:#24314d;margin-bottom:12px}.tiny{font-size:11px;color:#65748b}.tag{display:inline-block;padding:5px 9px;font-size:10px;font-weight:750;border-radius:7px;white-space:nowrap}.urgent{color:#ed6a75;background:#fff0f1}.high{color:#d3954b;background:#fff4e7}.medium{color:#7786c4;background:#eef2ff}.done{color:#2aaa83;background:#eaf9f2}.strike{text-decoration:line-through;color:#a6b0c2}.task-title{font-size:12px;font-weight:750;margin-bottom:4px}.task-meta{font-size:10px;color:#65748b;line-height:1.8}.task-score{font-size:10px;color:#a090d5;margin-top:3px}.task-row{padding:11px 0}.row-line{height:1px;background:#eef1f7;margin:4px 0}.stCheckbox{padding-top:3px}.schedule-row{display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid #f0f2f7}.schedule-time{font-size:11px;font-weight:800;color:#7c70f9;min-width:42px}.schedule-content{border-left:3px solid #9d8bff;padding-left:14px}.schedule-title{font-size:12px;font-weight:750}.schedule-meta{font-size:10px;color:#65748b;margin-top:4px}\n.speech-line{display:flex;gap:12px;border-bottom:1px solid #edf0f6;padding:13px 0}.speaker{font-size:10px;font-weight:750;background:#eeeaff;color:#7162e4;border-radius:7px;padding:5px 8px;height:fit-content;white-space:nowrap}.speaker.s1{background:#e8f4ff;color:#5b9cc9}.speaker.s2{background:#e9f8f1;color:#44a37e}.speech-text{font-size:12px;color:#53617a;line-height:1.8}.speech-time{font-size:10px;color:#a5b0c4;margin-bottom:3px}\n.st-key-card_meeting_result{padding:23px}.st-key-card_meeting_input [data-testid="stFileUploader"]{background:#fbfbff;border:1px dashed #d4d4ef;padding:9px;border-radius:13px}.st-key-card_meeting_input [data-testid="stFileUploaderDropzone"]{background:transparent}\n.st-key-card_todo_list .stRadio>div{gap:6px}.st-key-card_todo_list [role="radiogroup"] label{background:#fff;border:1px solid #e3e6f1;border-radius:10px;padding:5px 10px}.st-key-card_todo_list [role="radiogroup"] label:has(input:checked){background:#625afa;color:#fff;border-color:#625afa}\n.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-left:1px solid #e8edf5;border-top:1px solid #e8edf5;margin-top:16px}.cal-head{padding:11px;text-align:center;color:#a1aec2;font-size:10px;border-right:1px solid #e8edf5;border-bottom:1px solid #e8edf5}.cal-cell{min-height:110px;padding:8px;border-right:1px solid #e8edf5;border-bottom:1px solid #e8edf5;overflow:hidden;min-width:0}.cal-cell.outside{background:#fafbfe}.cal-number{display:grid;place-items:center;width:25px;height:25px;font-size:10px;font-weight:750;color:#8595ae;margin-bottom:5px}.cal-number.today{background:#625afa;border-radius:50%;color:white}.cal-item{font-size:9px;padding:4px 5px;border-radius:5px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#f0edff;color:#7464ed}.cal-item.task{background:#fff2e7;color:#cc965f}.cal-item.finished{opacity:.55;text-decoration:line-through}.legend{font-size:11px;color:#98a5bb;margin:10px 0}\n.chat-welcome{display:flex;align-items:center;gap:22px;padding:12px 0 20px}.chat-welcome img{width:110px}.chat-welcome h2{margin-bottom:9px}.chat-welcome p{color:#93a1b9}.st-key-card_assistant [data-testid="stChatMessage"]{border-radius:14px;border:1px solid #eceef7;background:#fafbff}\n@media(max-width:900px){.block-container{padding:1.3rem 1rem}.statrow{grid-template-columns:repeat(2,1fr);gap:10px}.hero-copy{width:100%}.cal-cell{min-height:82px;padding:4px}.cal-item{font-size:8px}.topline h1{font-size:21px!important}.topright{gap:5px}[class*="st-key-card_"]{padding:16px}}\n\n[data-testid="stSidebarCollapsedControl"]{visibility:visible!important;opacity:1!important}\n[data-testid="stDataFrame"]{border:1px solid #e0e5ef;border-radius:12px;overflow:hidden}\n[data-testid="stMetric"]{background:#f7f8fc;border:1px solid #e7ecf5;border-radius:12px;padding:14px}\n[data-testid="stMetricValue"]{font-size:25px;color:#26324b}\n[data-testid="stTabs"] [role="tab"]{font-size:14px;font-weight:650}\n[data-testid="stCaptionContainer"] p{color:#65748b}\n.st-key-hero{min-height:255px}\n\n</style>\n'
 CALENDAR_CSS = "\n.fc {\n    font-family: 'Pretendard', 'Malgun Gothic', sans-serif;\n    color: #28334F;\n}\n\n.fc .fc-toolbar {\n    margin-bottom: 22px !important;\n    flex-wrap: wrap;\n    gap: 12px;\n}\n\n.fc .fc-toolbar-title {\n    color: #293451;\n    font-size: 22px !important;\n    font-weight: 800;\n    letter-spacing: -.6px;\n}\n\n.fc .fc-button-primary {\n    background: #F2EEFC !important;\n    color: #6756C8 !important;\n    border: none !important;\n    border-radius: 9px !important;\n    font-weight: 600;\n    box-shadow: none !important;\n}\n\n.fc .fc-button-primary:hover {\n    background: #E4DCFA !important;\n}\n\n.fc .fc-button-active {\n    background: #6756C8 !important;\n    color: #FFFFFF !important;\n}\n\n.fc .fc-today-button {\n    background: #E8F1FC !important;\n    color: #4177B5 !important;\n}\n\n.fc .fc-col-header-cell {\n    background: #F8F6FE;\n    border-color: #EDE9F5 !important;\n    padding: 12px 0 !important;\n}\n\n.fc .fc-col-header-cell-cushion {\n    color: #6E6B83;\n    font-size: 12px;\n    font-weight: 700;\n    text-decoration: none;\n}\n\n.fc .fc-scrollgrid,\n.fc td,\n.fc th {\n    border-color: #EEEBF4 !important;\n}\n\n.fc .fc-daygrid-day {\n    background: #FFFFFF;\n}\n\n.fc .fc-daygrid-day-number {\n    color: #3A4460;\n    padding: 10px !important;\n    font-size: 12px;\n    text-decoration: none;\n}\n\n.fc .fc-day-today {\n    background: #F0ECFC !important;\n}\n\n.fc .fc-day-today .fc-daygrid-day-number {\n    background: #6756C8;\n    color: white !important;\n    border-radius: 50%;\n    width: 31px;\n    height: 31px;\n    display: flex;\n    justify-content: center;\n    align-items: center;\n    margin: 5px;\n    padding: 0 !important;\n}\n\n.fc .fc-day-other {\n    background: #FCFBFE;\n}\n\n.fc .fc-day-other .fc-daygrid-day-number {\n    color: #BDC1D2;\n}\n\n.fc .fc-daygrid-event {\n    border-radius: 6px !important;\n    padding: 3px 5px !important;\n    font-size: 11px;\n    font-weight: 600;\n    border: 0 !important;\n}\n\n.fc .fc-event-title {\n    font-weight: 600;\n}\n\n.fc .fc-list-event:hover td {\n    background: #F1EEFB !important;\n}\n"
 st.html(APP_CSS)
 
 # 6차 통합 UI: 5차의 데이터·음성·파일 처리와 표 편집 기능을 유지합니다.
-BASE_DIR = Path(__file__).resolve().parent
 
 def esc(value):
     return html.escape(str(value or ""), quote=True)
 
-def robot_uri():
-    image = BASE_DIR / "assets" / "able.png"
-    return "data:image/png;base64," + base64.b64encode(image.read_bytes()).decode() if image.exists() else ""
 
 def render_header(title, breadcrumb):
     st.html(f'<div class="topline"><div><div class="eyebrow">{esc(breadcrumb)}</div><h1>{esc(title)}</h1></div><span class="mode-tag">✦ AI WORK MATE</span></div>')
@@ -3811,7 +3829,7 @@ def task_score(t):
 
 def render_compact_task(t, prefix):
     a,b,c = st.columns([.35,5,1.1],vertical_alignment="center")
-    checked = a.checkbox("완료",value=bool(t["done"]),label_visibility="collapsed",key=prefix+t["id"])
+    checked = a.checkbox("완료",value=bool(t["done"]),label_visibility="collapsed",key=prefix+str(t["id"]))
     if checked != bool(t["done"]):
         update_task(t["id"],done=int(checked))
         st.rerun()
@@ -3829,8 +3847,7 @@ def render_dashboard():
     events = [t for t in mine if t["kind"]=="일정" and t["due_date"] == str(kst_today())]
     left,right = st.columns([2,1],gap="medium")
     with left,st.container(key="hero"):
-        robot = f'<img class="hero-robot" src="{robot_uri()}" alt="에이블"/>' if robot_uri() else ""
-        st.html(f'<div class="hero-copy"><div class="hero-kicker">{kst_today():%Y.%m.%d} · DAILY BRIEFING</div><h2>{esc(S.user)}님, 좋은 하루예요.<br>오늘의 업무를 함께 정리해 볼까요?</h2><div class="hero-sub">오늘 일정 <b>{len(events)}건</b> · 처리할 내 업무 <b>{len(pending)}건</b><br>회의에서 결정된 업무와 일정을 한눈에 확인하세요.</div></div>{robot}')
+        st.html(f'<div class="hero-copy"><div class="hero-kicker">{kst_today():%Y.%m.%d} · DAILY BRIEFING</div><h2>{esc(S.user)}님, 좋은 하루예요.<br>오늘의 업무를 함께 정리해 볼까요?</h2><div class="hero-sub">오늘 일정 <b>{len(events)}건</b> · 처리할 내 업무 <b>{len(pending)}건</b><br>회의에서 결정된 업무와 일정을 한눈에 확인하세요.</div></div>')
         if st.button("✧ 에이블에게 오늘 업무 물어보기",key="home_ask"):
             S.quick_question="오늘 내 업무와 일정, 먼저 처리할 일을 정리해줘"
             navigate("AI 비서")
@@ -4170,12 +4187,7 @@ LOGIN_STORAGE = st.components.v2.component(
 
 # 로그인 계정 정보 가져오기
 def login_setting(name):
-    try:
-        if name in st.secrets:
-            return str(st.secrets[name]).strip()
-    except Exception:
-        pass
-
+    # load_settings에서 파일과 Secrets를 한 번에 병합합니다.
     return str(SETTINGS.get(name, "")).strip()
 
 
@@ -4264,10 +4276,15 @@ def render_login():
             expected_no = login_setting("APP_LOGIN_EMPLOYEE_NO")
 
             if not expected_id or not expected_pw:
-                st.error(
-                    "로그인 계정 정보가 설정되지 않았습니다. "
-                    "api_key.txt 또는 Secrets를 확인하세요."
-                )
+                missing = [key for key, value in [("APP_LOGIN_ID", expected_id), ("APP_LOGIN_PASSWORD", expected_pw)] if not value]
+                st.error("앱에서 읽지 못한 로그인 설정: " + ", ".join(missing))
+                with st.expander("로그인 설정 확인 방법", expanded=True):
+                    st.write("큰따옴표는 있어도 됩니다. 로그인 아이디·비밀번호 값은 화면에 표시하지 않습니다.")
+                    paths = list(dict.fromkeys(str(f.resolve()) for f in [DATA_DIR / "api_key.txt", Path("api_key.txt")]))
+                    for filename in paths:
+                        st.caption(("파일 있음: " if Path(filename).is_file() else "파일 없음: ") + filename)
+                    st.write("Colab: 위 경로의 api_key.txt에 두 설정을 저장하고, 노트북 2번 API 설정 셀과 6번 실행 셀을 다시 실행하세요.")
+                    st.write("Streamlit Cloud: 앱 Settings → Secrets에 APP_LOGIN_ID와 APP_LOGIN_PASSWORD를 등록하고 앱을 다시 시작하세요. Drive 파일은 Cloud에서 자동으로 읽지 않습니다.")
                 return
 
             # 로그인 방식별 계정 확인
