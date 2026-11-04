@@ -184,6 +184,18 @@ def db_execute(sql, params=()):
         db.execute(sql, params)
 
 
+def delete_meeting(meeting_id, delete_related=False):
+    # 회의록과 연결 항목 삭제를 하나의 트랜잭션으로 처리합니다.
+    with connect_db() as db:
+        if not db.execute("SELECT id FROM meetings WHERE id=?", (meeting_id,)).fetchone():
+            raise ValueError("이미 삭제된 회의록입니다.")
+        if delete_related:
+            db.execute("DELETE FROM tasks WHERE meeting_id=?", (meeting_id,))
+            db.execute("DELETE FROM events WHERE meeting_id=?", (meeting_id,))
+        # 할 일·일정을 남기면 ON DELETE SET NULL로 회의 연결만 해제합니다.
+        db.execute("DELETE FROM meetings WHERE id=?", (meeting_id,))
+
+
 def get_meetings():
     return db_rows("SELECT * FROM meetings ORDER BY id DESC")
 
@@ -636,7 +648,11 @@ def render_transcript(text):
 
 
 def seed_demo():
+    # 샘플 회의록을 삭제한 뒤 다시 실행해도 자동으로 복구하지 않습니다.
+    if db_rows("SELECT value FROM settings WHERE key='demo_seeded'"):
+        return
     if get_meetings():
+        db_execute("INSERT OR REPLACE INTO settings(key,value) VALUES ('demo_seeded','1')")
         return
     day = datetime.now(KST).date()
     d = lambda offset: (day + timedelta(days=offset)).isoformat()
@@ -650,7 +666,7 @@ def seed_demo():
         db_execute("INSERT INTO tasks(title,assignee,due_date,priority,notes,done,created_at) VALUES (?,?,?,?,?,?,?)",(title,name,due,priority,"샘플 업무",done,datetime.now(KST).isoformat()))
     for title, tm in [("프로젝트 팀 회의","10:00"),("진행 현황 점검","14:00")]:
         db_execute("INSERT INTO events(title,event_date,event_time,notes,created_at) VALUES (?,?,?,?,?)",(title,d(0),tm,"샘플 일정",datetime.now(KST).isoformat()))
-
+    db_execute("INSERT OR REPLACE INTO settings(key,value) VALUES ('demo_seeded','1')")
 
 # ============================================================
 # 5. '에이블' 호출과 브라우저 음성 인식 컴포넌트
@@ -1019,7 +1035,7 @@ elif page == "todo":
                 if status=="이번 주" and (not task.get("due_date") or not today<=date.fromisoformat(task["due_date"])<=today+timedelta(days=7)):continue
                 if query.casefold() not in task["title"].casefold():continue
                 render_task_row(task,"todo")
-                with st.popover("수정 · 상세",use_container_width=False):
+                with st.popover("수정 · 상세 · 삭제",use_container_width=False):
                     with st.form(f"edit_task_{task['id']}"):
                         name=st.text_input("업무명",value=task["title"])
                         owner=st.text_input("담당자",value=task["assignee"] or "")
@@ -1033,6 +1049,15 @@ elif page == "todo":
                                 db_execute("UPDATE tasks SET title=?,assignee=?,due_date=?,priority=?,notes=? WHERE id=?",(name.strip(),owner.strip(),validate_day(due) or None,pr,notes,task["id"]))
                                 st.rerun()
                             except Exception as exc:st.error(str(exc))
+                    st.divider()
+                    st.caption("이 업무를 삭제하면 대시보드와 캘린더의 업무 마감일에서도 사라집니다.")
+                    confirm_delete=st.checkbox("이 업무를 삭제합니다.",key=f"confirm_task_delete_{task['id']}")
+                    if st.button("업무 삭제",key=f"delete_task_{task['id']}",disabled=not confirm_delete):
+                        try:
+                            db_execute("DELETE FROM tasks WHERE id=?",(task["id"],))
+                            st.session_state.flash="업무를 삭제했어요."
+                            st.rerun()
+                        except Exception as exc:st.error(str(exc))
             if not tasks:st.markdown('<div class="empty">등록된 업무가 없어요.</div>',unsafe_allow_html=True)
     with right:
         with st.container(key="card_todo_add"):
@@ -1147,6 +1172,20 @@ elif page == "archive":
                 for item in json.loads(m["decisions"]):st.write("•",item)
                 render_transcript(m["transcript"])
                 st.download_button("회의록 다운로드",data=m["summary"]+"\n\n"+m["transcript"],file_name=f"meeting_{m['id']}.txt",key=f"dl_{m['id']}")
+                with st.popover("회의록 삭제"):
+                    linked_tasks=db_rows("SELECT COUNT(*) AS count FROM tasks WHERE meeting_id=?",(m["id"],))[0]["count"]
+                    linked_events=db_rows("SELECT COUNT(*) AS count FROM events WHERE meeting_id=?",(m["id"],))[0]["count"]
+                    st.write(f"삭제할 회의록: {m['title']}")
+                    st.caption(f"연결된 할 일 {linked_tasks}개 · 일정 {linked_events}개")
+                    delete_related=st.checkbox("연결된 할 일·일정도 함께 삭제",value=False,key=f"delete_meeting_related_{m['id']}")
+                    st.caption("체크하지 않으면 할 일·일정은 남기고 회의 연결만 해제합니다.")
+                    confirm_delete=st.checkbox("이 회의록을 삭제합니다.",key=f"confirm_meeting_delete_{m['id']}")
+                    if st.button("선택한 회의록 삭제",key=f"delete_meeting_{m['id']}",disabled=not confirm_delete):
+                        try:
+                            delete_meeting(m["id"],delete_related)
+                            st.session_state.flash="회의록과 연결된 할 일·일정을 삭제했어요." if delete_related else "회의록을 삭제했어요. 할 일·일정은 유지했어요."
+                            st.rerun()
+                        except Exception as exc:st.error(str(exc))
         if not matches:st.markdown('<div class="empty">검색된 회의록이 없어요.</div>',unsafe_allow_html=True)
 
 elif page == "briefing":
