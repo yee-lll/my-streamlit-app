@@ -439,42 +439,60 @@ def seconds_to_clock(seconds):
 
 
 def make_speech_text(text):
-    # 이전 답변이나 브리핑도 기호를 그대로 읽지 않도록 정리합니다.
-    text = str(text or "")
-    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
-    text = re.sub(r"[*_`#]", "", text)
-    text = re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]", "", text)
-    text = re.sub(r"(\d{1,2}):(\d{2})", lambda m: f"{int(m[1])}시" + (f" {int(m[2])}분" if int(m[2]) else ""), text)
-    ordinals = {1:"첫 번째", 2:"두 번째", 3:"세 번째", 4:"네 번째", 5:"다섯 번째"}
-    lines = []
+    """화면 표시는 유지하고 읽기용 문장에서 기호·날짜·시간·호흡만 정리합니다."""
+    text=str(text or "")
+    text=re.sub(r"\[([^\]]+)\]\([^)]+\)",r"\1",text)
+    text=re.sub(r"[*_`#]","",text)
+    text=re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]","",text)
+    text=re.sub(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)",lambda m:f"{int(m[1])}년 {int(m[2])}월 {int(m[3])}일",text)
+    def clock(match):
+        hour,minute=int(match[1]),int(match[2])
+        if hour>23 or minute>59:return match.group()
+        return f"{'오전' if hour<12 else '오후'} {hour%12 or 12}시"+(f" {minute}분" if minute else "")
+    text=re.sub(r"(?<!\d)(\d{1,2}):(\d{2})(?!\d)",clock,text)
+    ordinals={1:"먼저",2:"다음으로",3:"이어서",4:"그다음으로",5:"마지막으로"}
+    lines=[]
     for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        item = re.match(r"^(\d+)[.)]\s*(.*)", line)
-        if item:
-            number, content = int(item[1]), item[2].strip()
-            line = ordinals.get(number, f"{number}번째") + "는 " + content
-            if content and not content.endswith((".", "?", "!", "요", "다", "죠")):
-                line += "입니다."
-        else:
-            line = re.sub(r"^[-•]\s*", "", line)
-        line = re.sub(r"[:：]", " ", line)
-        line = re.sub(r"^\[([^\]]+)\]$", r"\1을 말씀드릴게요.", line)
-        lines.append(line)
-    return re.sub(r"[ \t]+", " ", " ".join(lines)).strip()
+        line=line.strip()
+        if not line:continue
+        item=re.match(r"^(\d+)[.)]\s*(.*)",line)
+        if item:line=ordinals.get(int(item[1]),"이어서")+", "+item[2].strip()
+        else:line=re.sub(r"^[-•]\s*","",line)
+        line=re.sub(r"[:：]"," ",line)
+        line=re.sub(r"^\[([^\]]+)\]$",r"\1",line)
+        lines.append(re.sub(r"[ \t]+"," ",line))
+    return "\n".join(lines).strip()
+
+
+@st.cache_data(show_spinner=False,ttl=3600,max_entries=24)
+def natural_speech_audio(text,voice,speed):
+    """동일한 문장·목소리·속도의 음성을 재사용하고 API 실패는 호출부에서 대체합니다."""
+    client=get_client()
+    if callable(getattr(client,"with_options",None)):
+        client=client.with_options(timeout=15,max_retries=0)
+    response=client.audio.speech.create(
+        model="gpt-4o-mini-tts",voice=voice,input=text,speed=speed,
+        instructions="""한국어로 친절한 개인 비서처럼 자연스럽게 대화해 주세요.
+옆 사람에게 차분하게 설명하듯 부드러운 해요체의 억양을 사용하고, 문장의 의미에 따라 높낮이와 강세를 가볍게 조절하세요.
+뉴스 낭독이나 기계적인 안내 방송처럼 또박또박 끊어 읽지 마세요. 문장과 문단 사이에 짧고 자연스러운 쉼을 두세요.
+날짜, 시간, 업무 이름은 정확하고 편하게 들리게 읽되 과도하게 강조하지 마세요.
+입력에 없는 내용, 웃음소리, 추임새, 인사말을 새로 덧붙이지 말고 제공된 문장만 읽어 주세요.""",
+        response_format="mp3")
+    return response.content
 
 
 def text_to_speech(text):
-    # 음성용 문장을 TTS로 전달
-    text = make_speech_text(text)
-    client = get_client()
-    if not text.strip() or len(text) > 4096:
-        raise ValueError("음성 출력할 내용을 1~4,096자로 줄여주세요.")
-    speech_response = client.audio.speech.create(
-        model="gpt-4o-mini-tts", voice=st.session_state.get("voice_name","nova"), input=text, speed=float(st.session_state.get("voice_speed",1.0))
-    )
-    return speech_response.content
+    text=make_speech_text(text)
+    if not text or len(text)>4096:raise ValueError("음성 출력할 내용을 1~4,096자로 줄여주세요.")
+    voice=st.session_state.get("voice_name","marin")
+    speed=float(st.session_state.get("voice_speed",1.0))
+    return natural_speech_audio(text,voice,min(2.0,max(.5,speed)))
+
+
+def prepared_speech_audio(text):
+    if not os.getenv("OPENAI_API_KEY"):return ""
+    try:return base64.b64encode(text_to_speech(text)).decode()
+    except Exception:return ""  # API 연결이 안 되면 재생기는 브라우저 한국어 음성으로 이어집니다.
 
 
 
@@ -654,23 +672,23 @@ def spoken_work_briefing(tasks,events,day=None,name=None):
     due_today=[task for task in pending if task["due_date"]==today.isoformat()]
     remaining=[task for task in pending if not task["due_date"] or task["due_date"]>today.isoformat()]
     appointments=sorted([event for event in events if event.get("event_date")==today.isoformat()],key=lambda event:event.get("event_time") or "99:99")
-    lines=[f"{who}님, 좋은 하루입니다. 금일 일정에 대해 말씀드리겠습니다.",
-           f"{today.month}월 {today.day}일 {WEEKDAY_NAMES[today.weekday()]} 기준입니다."]
-    lines.append(f"당일 마감 업무는 {len(due_today)}건입니다." if due_today else "당일 마감 업무는 0건으로 없습니다.")
-    lines.append(f"해야 하는 업무는 총 {len(pending)}건이며, 이 중 지연 업무는 {len(overdue)}건입니다.")
+    lines=[f"{who}님, 안녕하세요. 오늘 할 일을 함께 확인해 볼게요.",
+           f"오늘은 {today.month}월 {today.day}일 {WEEKDAY_NAMES[today.weekday()]}이에요."]
+    lines.append(f"오늘 마감인 업무는 {len(due_today)}건이에요." if due_today else "오늘 마감인 업무는 없어요.")
+    lines.append(f"해야 할 일은 모두 {len(pending)}건이고, 그중 마감이 지난 일은 {len(overdue)}건이에요.")
     def title(item):return re.sub(r"\s+"," ",str(item["title"])).strip()[:80]
     def clock(value):
         try:hh,mm=map(int,str(value).split(":"))
         except (ValueError,TypeError):return "시간 미정"
         return f"{'오전' if hh<12 else '오후'} {hh%12 or 12}시"+(f" {mm}분" if mm else "")
     if appointments:
-        lines.append(f"오늘 예정된 일정은 {len(appointments)}건입니다.")
-        lines.extend(f"{clock(event.get('event_time'))}에 {title(event)} 일정이 있습니다." if event.get("event_time") else f"{title(event)} 일정이 있으며, 시간은 아직 정해지지 않았습니다." for event in appointments[:3])
+        lines.append(f"오늘 예정된 일정은 {len(appointments)}건이에요.")
+        lines.extend(f"{clock(event.get('event_time'))}에 {title(event)} 일정이 있어요." if event.get("event_time") else f"{title(event)} 일정이 있고, 시간은 아직 정해지지 않았어요." for event in appointments[:3])
         if len(appointments)>3:lines.append(f"그 밖의 일정 {len(appointments)-3}건은 캘린더에서 확인해 주세요.")
     if not pending:
-        lines.append("현재 처리할 미완료 업무는 없습니다. 오늘 일정에 맞춰 하루를 준비하시면 좋겠습니다.")
+        lines.append("지금 처리할 미완료 업무는 없어요. 오늘 일정에 맞춰 하루를 준비하시면 좋겠어요.")
         return "\n\n".join(lines)
-    lines.append("업무 수행 우선순위에 대해 말씀드리겠습니다.")
+    lines.append("어떤 일부터 하면 좋을지 살펴볼게요.")
     overdue.sort(key=lambda task:(task["due_date"],-priority_score(task,today)))
     due_today.sort(key=lambda task:(-priority_score(task,today),task.get("due_time") or "99:99"))
     remaining.sort(key=lambda task:(-priority_score(task,today),task["due_date"] or "9999-12-31"))
@@ -678,13 +696,13 @@ def spoken_work_briefing(tasks,events,day=None,name=None):
     for label,items in (("먼저 지연된 업무",overdue),("다음으로 오늘 마감 업무",due_today),("이어서 남은 우선 업무",remaining)):
         if not items or budget<=0:continue
         selected=items[:min(3,budget)];budget-=len(selected)
-        lines.append(label+"를 안내드리겠습니다.")
+        lines.append(label+"부터 살펴볼게요.")
         for task in selected:
             extra=""
             if task in overdue:extra=f"마감일 {task['due_date']}이 지났습니다. 우선 진행 상황과 남은 일정을 확인해 주세요."
             elif task in due_today:extra=(clock(task.get("due_time"))+"까지 완료해 주세요.") if task.get("due_time") else "오늘 안에 마무리할 수 있도록 진행해 주세요."
             elif task["due_date"]:
-                due=date.fromisoformat(task["due_date"]);extra=f"마감은 {due.month}월 {due.day}일 {WEEKDAY_NAMES[due.weekday()]}입니다."
+                due=date.fromisoformat(task["due_date"]);extra=f"마감은 {due.month}월 {due.day}일 {WEEKDAY_NAMES[due.weekday()]}이에요."
             else:extra="마감일이 정해지지 않아 완료 기한을 확인해 주세요."
             lines.append(title(task)+". "+extra)
         if len(items)>len(selected):lines.append(f"같은 분류의 나머지 {len(items)-len(selected)}건은 To-Do 목록에서 확인해 주세요.")
@@ -1072,7 +1090,7 @@ export default function(component) {
   let data={}, submit=component.setTriggerValue, alive=true, report=component.setStateValue;
   let voiceStatus='', replyAudio=null, externalAudio=null, draftTimer=null, lastDraft='', lastDraftAt=0, directCapture=false;
   let recognition=null, timer=null, speechTimer=null, quietTimer=null;
-  let busy=false, speaking=Boolean(window._ableVoicePlayback?.playing), utterance=null, networkErrors=0, externalBriefing=false;
+  let busy=false, speaking=Boolean(window._ableVoicePlayback?.playing||window._ableHomeBriefing?.active), utterance=null, networkErrors=0, externalBriefing=Boolean(window._ableHomeBriefing?.active);
   let finalBuffer=String(window._ableVoiceDraftText||''), liveText=finalBuffer, hasPartial=false;
   let lastReplyId=sessionStorage.getItem('wm-able-last-reply-fresh-20261105')||'';
   const join=(...parts)=>parts.map(t=>String(t||'').trim()).filter(Boolean).join(' ');
@@ -1298,6 +1316,7 @@ function nativeAudioStarted(event){
      return {play,stop,ownsAudio:(audio)=>Boolean(player&&player===audio),get playing(){return active;}};
    })());
    function sayReply(force=false, snapshot=null){
+     window._ableHomeBriefing?.stop?.();
      stopRecognition();clearDraft(false);
      const reply=String(snapshot?.reply??data.reply??'');
      const audio=snapshot?.audio??data.audio;
@@ -1388,80 +1407,7 @@ wake_component = st.components.v2.component("work_mate_able_wake", html=VOICE_HT
 
 # 브리핑 버튼은 Python 콜백을 거치지 않습니다. 클릭 즉시 브라우저 음성으로
 # 전체 문장을 짧게 나누어 읽으며, 화면을 가리거나 오디오 재생바를 만들지 않습니다.
-HOME_BRIEFING_JS = r"""
-export default function(component){
- const root=component.parentElement.querySelector('.home-briefing-player');
- const play=root.querySelector('button'),hint=root.querySelector('.home-briefing-hint');
- const synth=window.speechSynthesis;
- const input=component.data||{};
- const text=String(input.text||'').trim(),rate=Number(input.rate)||1;
- const owner=window._ableHomeBriefing;
- if(owner?.active&&owner?.stop)owner.stop();
- let active=false,utterance=null,watchdog=null,index=0,stalledAt=0;
- function splitSpeech(content){
-   const sentences=content.replace(/\n+/g,' ').match(/[^.!?。！？]+[.!?。！？]?/g)||[content];
-   const chunks=[];let current='';
-   for(const sentence of sentences){
-     const words=sentence.trim().split(/\s+/).filter(Boolean);
-     for(const word of words){
-       if(current.length+word.length+1>100&&current){chunks.push(current.trim());current='';}
-       if(word.length>100){
-         if(current){chunks.push(current.trim());current='';}
-         for(let pos=0;pos<word.length;pos+=95)chunks.push(word.slice(pos,pos+95));
-       }else current+=(current?' ':'')+word;
-     }
-   }
-   if(current.trim())chunks.push(current.trim());
-   return chunks;
- }
- const chunks=splitSpeech(text);
- function refresh(){play.textContent=active?'■ 브리핑 멈추기':'🔊 오늘 업무 브리핑 듣기';}
- function stop(){
-   active=false;clearInterval(watchdog);watchdog=null;
-   if(utterance){utterance.onend=utterance.onerror=utterance.onstart=null;utterance=null;}
-   synth?.cancel();window._workMateAbleVoice?.endExternalBriefing?.();
-   refresh();
- }
- function finish(message){stop();hint.textContent=message||'브리핑 재생을 마쳤어요.';}
- function next(){
-   if(!active)return;
-   if(index>=chunks.length){finish('브리핑을 끝까지 읽었습니다.');return;}
-   const speech=new SpeechSynthesisUtterance(chunks[index++]);utterance=speech;
-   speech.lang='ko-KR';speech.rate=Math.min(1.5,Math.max(0.6,rate));
-   const voices=synth.getVoices?.()||[];
-   const korean=voices.find(v=>String(v.lang).toLowerCase().startsWith('ko'));
-   if(korean)speech.voice=korean;
-   speech.onstart=()=>{if(utterance===speech){stalledAt=Date.now();hint.textContent='브리핑 재생 중…';}};
-   speech.onend=()=>{if(active&&utterance===speech){utterance=null;setTimeout(next,60);}};
-   speech.onerror=e=>{if(!active||utterance!==speech)return;
-      if(e.error==='interrupted'||e.error==='canceled')return;
-      finish('음성 재생이 중단됐습니다. 버튼을 눌러 다시 시도해 주세요.');};
-   try{synth.resume?.();synth.speak(speech);}catch(e){finish('이 브라우저에서 음성을 시작하지 못했습니다.');}
- }
- function start(){
-   if(!text||!chunks.length){hint.textContent='읽을 브리핑 내용이 없습니다.';return;}
-   if(!synth||typeof SpeechSynthesisUtterance==='undefined'){
-     hint.textContent='브라우저에서 한국어 음성 읽기를 지원하지 않습니다.';return;
-   }
-   window._ableHomeBriefing?.stop?.();
-   window._workMateAbleVoice?.beginExternalBriefing?.();
-   synth.cancel();active=true;index=0;refresh();hint.textContent='브리핑 재생 중…';
-   window._ableHomeBriefing={stop,get active(){return active;}};
-   next();
-   // Chrome의 긴 문장 음성 합성 중단을 방지: 100자 이하 구간마다 이어 읽습니다.
-   watchdog=setInterval(()=>{
-     if(!active)return;
-     if(synth.paused)synth.resume();
-     if(stalledAt&&Date.now()-stalledAt>30000){
-       finish('음성 재생이 지연됐습니다. 버튼을 눌러 다시 시도해 주세요.');
-     }
-   },2500);
- }
- play.onclick=()=>{if(active)finish('브리핑 재생을 멈췄어요.');else start();};
- refresh();
- return ()=>{play.onclick=null;if(active&&window._ableHomeBriefing?.stop===stop)stop();};
-}
-"""
+HOME_BRIEFING_JS = "export default function(component){\n const root=component.parentElement.querySelector('.home-briefing-player');\n const version='natural-home-audio-1';\n let owner=window._ableHomeBriefing;\n if(owner?.version!==version){owner?.stop?.();owner?.dispose?.();owner=null;}\n if(!owner){\n  owner=(()=>{\n   let active=false,element=null,input={},audio=null,utterance=null,timer=null,token=0;\n   let chunks=[],index=0,spokenRate=1;\n   function message(text){const hint=element?.querySelector('.home-briefing-hint');if(hint)hint.textContent=text;}\n   function refresh(){const button=element?.querySelector('button');if(button)button.textContent=active?'■ 브리핑 멈추기':'🔊 오늘 업무 브리핑 듣기';}\n   function stop(text='브리핑 재생을 멈췄어요.'){\n    const wasActive=active;active=false;token++;clearTimeout(timer);timer=null;\n    if(audio){audio.onplaying=audio.onended=audio.onerror=null;audio.pause();audio=null;}\n    if(utterance){utterance.onstart=utterance.onend=utterance.onerror=null;utterance=null;window.speechSynthesis?.cancel();}\n    if(wasActive)window._workMateAbleVoice?.endExternalBriefing?.();\n    refresh();message(text);\n   }\n   function splitSpeech(content){\n    const sentences=String(content).match(/[^.!?。！？\\n]+[.!?。！？]?/g)||[String(content)];\n    const result=[];\n    for(const sentence of sentences){\n     let part='';\n     for(const word of sentence.trim().split(/\\s+/).filter(Boolean)){\n      if(part.length+word.length+1>100&&part){result.push(part);part='';}\n      if(word.length>100){if(part)result.push(part);part='';for(let pos=0;pos<word.length;pos+=95)result.push(word.slice(pos,pos+95));}\n      else part+=(part?' ':'')+word;\n     }\n     if(part)result.push(part);\n    }\n    return result;\n   }\n   function browserVoice(text,currentToken){\n    const synth=window.speechSynthesis;\n    if(!synth||typeof SpeechSynthesisUtterance==='undefined'){stop('이 브라우저에서 음성을 재생하지 못했어요.');return;}\n    chunks=splitSpeech(text);index=0;\n    function next(){\n     if(!active||currentToken!==token)return;\n     if(index>=chunks.length){stop('브리핑을 끝까지 읽었어요.');return;}\n     const speech=new SpeechSynthesisUtterance(chunks[index++]);utterance=speech;\n     speech.lang='ko-KR';speech.rate=spokenRate;\n     const korean=(synth.getVoices?.()||[]).filter(v=>String(v.lang).toLowerCase().startsWith('ko'));\n     const voice=korean.find(v=>/natural|neural|online|google/i.test(v.name||''))||korean[0];\n     if(voice)speech.voice=voice;\n     let began=false;\n     speech.onstart=()=>{if(currentToken===token){began=true;message('브리핑을 전하고 있어요.');}};\n     speech.onend=()=>{if(currentToken===token&&active){clearTimeout(timer);utterance=null;timer=setTimeout(next,80);}};\n     speech.onerror=()=>{if(currentToken===token)stop('음성 재생을 시작하지 못했어요. 다시 듣기를 눌러주세요.');};\n     try{synth.resume?.();synth.speak(speech);timer=setTimeout(()=>{if(currentToken===token&&active&&!began)stop('자동 재생이 차단됐어요. 다시 듣기를 눌러주세요.');},10000);}\n     catch(e){stop('음성 재생을 시작하지 못했어요.');}\n    }\n    next();\n   }\n   function start(){\n    const text=String(input.text||'').trim(),bytes=input.audio;\n    if(!text){message('읽을 브리핑 내용이 없어요.');return;}\n    stop('');window._workMateAbleVoice?.beginExternalBriefing?.();\n    active=true;const currentToken=++token;spokenRate=Math.min(1.5,Math.max(.6,Number(input.rate)||1));refresh();message('브리핑을 전하고 있어요.');\n    if(bytes&&typeof Audio!=='undefined'){\n     const player=new Audio('data:audio/mp3;base64,'+bytes);audio=player;\n     const fallback=()=>{if(currentToken!==token||!active)return;player.onplaying=player.onended=player.onerror=null;player.pause();audio=null;browserVoice(text,currentToken);};\n     player.onplaying=()=>{if(currentToken===token)message('브리핑을 전하고 있어요.');};\n     player.onended=()=>{if(currentToken===token)stop('브리핑을 끝까지 읽었어요.');};player.onerror=fallback;\n     try{const result=player.play();if(result?.catch)result.catch(fallback);}catch(e){fallback();}\n    }else browserVoice(text,currentToken);\n   }\n   function attach(nextRoot,nextInput){\n    if(element&&element!==nextRoot)element.querySelector('button').onclick=null;\n    element=nextRoot;input=nextInput||{};\n    element.querySelector('button').onclick=()=>active?stop():start();refresh();\n    if(active)message('브리핑을 전하고 있어요.');\n   }\n   function detach(oldRoot){oldRoot.querySelector('button').onclick=null;if(element===oldRoot)element=null;}\n   const onStop=()=>stop();window.addEventListener('able-stop-speech',onStop);\n   function dispose(){stop();window.removeEventListener('able-stop-speech',onStop);}\n   return {version,attach,detach,stop,dispose,get active(){return active;}};\n  })();\n  window._ableHomeBriefing=owner;\n }\n owner.attach(root,component.data);\n return ()=>owner.detach(root);\n}\n"
 HOME_BRIEFING_PLAYER = st.components.v2.component(
     "able_home_briefing_player",
     html='<div class="home-briefing-player"><button type="button">🔊 오늘 업무 브리핑 듣기</button><span class="home-briefing-hint" role="status" aria-live="polite"></span></div>',
@@ -1614,9 +1560,10 @@ def process_able(text, source="text", direct=False):
     # 화면의 Markdown과 읽기용 문장을 별도로 사용합니다.
     st.session_state.wake_reply = speech_text or make_speech_text(reply)
     st.session_state.wake_audio = ""
-    # 일반 AI 답변은 브라우저 한국어 TTS를 즉시 사용합니다.
-    # 서버에서 매번 MP3를 합성하면 Streamlit 재실행·지연 중 재생이 끊길 수 있습니다.
-    # 사용자가 직접 누르는 "답변 다시 듣기"는 별도 버튼으로 제공됩니다.
+    # 자연스러운 AI 음성을 우선하고 실패 시 브라우저 음성으로 대체합니다.
+    # 재생기는 위젯 외부에 보존되어 상태 갱신으로 답변이 끊기지 않습니다.
+    if st.session_state.get("speak_wake") or st.session_state.get("wake_greeting"):
+        st.session_state.wake_audio=prepared_speech_audio(st.session_state.wake_reply)
     st.session_state.voice_ui = "off" if st.session_state.wake_stage=="off" else "idle"
     st.session_state.wake_reply_id = str(time.time_ns())
     return reply
@@ -3314,7 +3261,7 @@ def assistant_answer(question):
 놓친 회의에서 내 업무를 묻는다면 assigned_meeting_items의 내 담당 항목을 우선 사용하고, 다른 사람이나 담당자 미확정 업무를 내 업무로 바꾸지 마세요. 보관 회의록과 사용자가 방금 말한 미팅 메모에서 내 할 일과 약속을 제안할 수 있습니다.
 등록 제안은 proposed_items 배열에 kind, title, assignee, date, time, priority, notes, evidence를 넣으세요. assignee는 확인된 내 이름만 사용하세요. 직접 새 업무를 등록하는 요청은 evidence가 빈 문자열이어도 됩니다. 회의록·메일에서 추출한 제안만 제공된 원문의 실제 구절을 evidence에 넣으세요. 날짜·시간은 YYYY-MM-DD·HH:MM 또는 null입니다. 할 일의 날짜 미정은 허용하지만 약속 날짜가 미정이면 먼저 물어보세요. 우선순위 근거가 없으면 보통으로 두세요. 이미 저장된 항목을 중복 제안하지 마세요. 제안이 없으면 proposed_items는 빈 배열입니다.
 pending_registration이 있으면 사용자의 추가 설명을 반영해 제안을 구체화할 수 있습니다. 사용자가 등록을 승인하면 제안 목록을 실제로 저장하세요.
-음성은 같은 사실을 기호·번호·이모지 없이 대화하듯 말하세요. 화면 답변은 1,500자 이내입니다."""
+speech_text는 의미와 날짜·시간·건수를 그대로 유지하면서 짧고 자연스러운 해요체로 써 주세요. '말씀드리겠습니다', '안내드리겠습니다'를 반복하지 말고 옆에서 도와주는 비서처럼 말하세요. 목록·번호·이모지를 읽지 말고 문장으로 연결하며, 문단마다 자연스러운 쉼을 둡니다. 없는 감정·성과·추임새는 덧붙이지 마세요. 화면 답변은 1,500자 이내입니다."""
     facts["pending_change"] = st.session_state.get("chat_action_pending")
     facts["focused_item"] = st.session_state.get("chat_focused_item")
     facts["pending_registration"] = st.session_state.get("chat_create_proposals")
@@ -3391,7 +3338,7 @@ migrate_integrated_schema()
 if "my_name" not in st.session_state:
     st.session_state.my_name = setting("my_name",os.getenv("APP_DISPLAY_NAME") or "김대리")
 for key,default in {"page":"home","chat_history":[],"wake_stage":"wake","wake_reply":"","wake_reply_id":"",
-                    "voice_ui":"idle","wake_audio":"","speak_wake":True,"voice_name":"nova","voice_speed":1.0,
+                    "voice_ui":"idle","wake_audio":"","speak_wake":True,"voice_name":"marin","voice_speed":1.0,
                     "sidebar_order":list(MENU),"sidebar_pins":[]}.items():
     if key not in st.session_state:
         st.session_state[key] = setting(key,default) if key in ("speak_wake","voice_name","voice_speed","sidebar_order","sidebar_pins") else default
@@ -3412,6 +3359,11 @@ if st.session_state.pop("_clear_voice_input", False):
     st.session_state.able_chat_prompt = ""
     st.session_state.floating_query = ""
 
+if not setting("natural_voice_ready",False):
+    if st.session_state.voice_name=="nova":
+        st.session_state.voice_name="marin"
+        save_setting("voice_name","marin")
+    save_setting("natural_voice_ready",True)
 st.session_state.sidebar_order = list(dict.fromkeys([x for x in st.session_state.sidebar_order if x in MENU]+list(MENU)))
 st.session_state.sidebar_pins = [x for x in st.session_state.sidebar_pins if x in MENU]
 if st.session_state.page not in MENU:
@@ -3514,7 +3466,8 @@ if page == "home":
             st.markdown('<div class="home-inbox-summary"><b>✉ 퇴근 후 받은 메일</b><small>'+esc(mail_period)+'</small>'+esc(home_mail_report).replace('\n','<br>')+'</div>',unsafe_allow_html=True)
             # 브라우저에서 클릭 즉시 읽으므로 Streamlit 페이지가 다시 실행되지 않습니다.
             speech=make_speech_text(spoken_work_briefing(all_tasks,all_events)+"\n\n"+home_mail_report)
-            HOME_BRIEFING_PLAYER(data={"text":speech,"rate":st.session_state.get("voice_speed",1.0)},key="home_read_briefing")
+            briefing_audio=prepared_speech_audio(speech)
+            HOME_BRIEFING_PLAYER(data={"text":speech,"audio":briefing_audio,"rate":st.session_state.get("voice_speed",1.0)},key="home_read_briefing")
             if st.button("에이블과 대화하기 →",key="home_chat"):
                 navigate("chat")
     urgent = sum(bool(t.get("due_date")) and t["due_date"]<=(today+timedelta(days=1)).isoformat() for t in pending)
@@ -4062,7 +4015,7 @@ elif page == "settings":
         st.markdown("### 음성 응답 설정")
         with st.form("voice_settings"):
             mode = st.selectbox("답변 방식",["음성 + 텍스트","텍스트만"],index=0 if st.session_state.speak_wake else 1)
-            voices = ["nova","alloy","echo","fable","onyx","shimmer"]
+            voices = ["marin","cedar","coral","nova","alloy","echo","fable","onyx","shimmer"]
             voice = st.selectbox("AI 음성",voices,index=voices.index(st.session_state.voice_name) if st.session_state.voice_name in voices else 0)
             speed = st.slider("재생 속도",0.75,2.0,float(st.session_state.voice_speed),step=0.05)
             if st.form_submit_button("음성 설정 저장"):
