@@ -34,7 +34,10 @@ from openai import OpenAI
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("AIVLE_DATA_DIR", str(BASE_DIR)))
 DATA_DIR.mkdir(parents=True,exist_ok=True)
-DB_FILE = Path(os.getenv("AI_WORK_MATE_DB", str(DATA_DIR / "work_mate.db")))
+# 새 저장소를 사용하며, 이전 DB 경로 설정과 기록은 불러오지 않습니다.
+WORKSPACE_ID = "fresh_20261105"
+VOICE_WIDGET_KEY = "able_wake_widget_" + WORKSPACE_ID
+DB_FILE = DATA_DIR / ("work_mate_" + WORKSPACE_ID + ".db")
 DB_FILE.parent.mkdir(parents=True,exist_ok=True)
 KST = ZoneInfo("Asia/Seoul")
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -164,25 +167,6 @@ def init_db():
         event_columns = {row[1] for row in db.execute("PRAGMA table_info(events)")}
         if "assignee" not in event_columns:
             db.execute("ALTER TABLE events ADD COLUMN assignee TEXT")
-
-        # 기본 주소록: 시연용 이름·직책·이메일 예시를 최초 한 번만 등록합니다.
-        if not db.execute("SELECT 1 FROM settings WHERE key='email_contacts_seeded_v1'").fetchone():
-            contacts = [
-                ("기획팀", "강서현 과장", "a104827@aivle.kt.co.kr"),
-                ("기획팀", "김수헌 대리", "d683250@aivle.kt.co.kr"),
-                ("개발팀", "사재훈 팀장", "a295614@aivle.kt.co.kr"),
-                ("인사팀", "장예리 대리", "d472903@aivle.kt.co.kr"),
-                ("마케팅팀", "최유진 주임", "a831756@aivle.kt.co.kr"),
-                ("운영팀", "황하랑 사원", "d560182@aivle.kt.co.kr"),
-            ]
-            db.executemany("INSERT OR IGNORE INTO contacts(department,name,email) VALUES (?,?,?)", contacts)
-            db.execute("INSERT INTO settings(key,value) VALUES ('email_contacts_seeded_v1','1')")
-
-        # 이전 기본 주소록을 사용 중인 경우에도 지정한 부서를 한 번 반영합니다.
-        if not db.execute("SELECT 1 FROM settings WHERE key='email_contact_roles_v2'").fetchone():
-            db.execute("UPDATE contacts SET department='기획팀' WHERE email=? AND name=? AND department=?", ("a104827@aivle.kt.co.kr", "강서현 과장", "인사팀"))
-            db.execute("UPDATE contacts SET department='인사팀' WHERE email=? AND name=? AND department=?", ("d472903@aivle.kt.co.kr", "장예리 대리", "서비스기획팀"))
-            db.execute("INSERT INTO settings(key,value) VALUES ('email_contact_roles_v2','1')")
 
 
 def db_rows(sql, params=()):
@@ -859,21 +843,21 @@ VOICE_HTML = """<div class="wake-box"><div class="wake-head">✦ 에이블 호�
 VOICE_CSS = """.wake-box{background:#f7f6ff;border:1px solid #e7e3ff;border-radius:13px;padding:12px;font-family:inherit}.wake-head{font-size:12px;font-weight:800;color:#5c54df;margin-bottom:10px}.wake-buttons{display:flex;gap:6px}.wake-buttons button,.wake-box>.send{border:1px solid #e0dcfa;background:white;color:#6a62d8;border-radius:8px;padding:8px;font-size:10px;cursor:pointer}.wake-buttons .start{background:#625afa;color:white;border-color:#625afa;flex:1}.wake-box>.send{width:100%;margin-top:7px}.wake-box>.send:disabled{opacity:.45;cursor:default}.status{font-size:10px;line-height:1.8;color:#8e9cba;margin-top:9px}.heard{font-size:10px;color:#6c7399;max-height:110px;overflow:auto;margin-top:4px}"""
 VOICE_JS = r"""
 export default function(component) {
-  const root=component.parentElement.querySelector('.wake-box'), version='integrated-voice-5';
+  const root=component.parentElement.querySelector('.wake-box'), version='integrated-voice-6-fresh';
   const previous=root._ableVoice||window._workMateAbleVoice;
   if(previous?.root===root&&previous.version===version){previous.update(component);return previous.dispose}
   previous?.dispose();
   const status=root.querySelector('.status'), heard=root.querySelector('.heard');
   const startButton=root.querySelector('.start'), stopButton=root.querySelector('.stop'), sendButton=root.querySelector('.send');
   const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const synth=window.speechSynthesis, storeKey='wm-able-listening', quietMs=2200;
+  const synth=window.speechSynthesis, storeKey='wm-able-listening-fresh-20261105', quietMs=2200;
   const wakePattern=/에\s*이\s*[블불브](?:[아야](?=\s|[,.!?~]|$))?/;
   let data={}, submit=component.setTriggerValue, alive=true, report=component.setStateValue;
   let voiceStatus='', replyAudio=null, draftTimer=null, lastDraft='', lastDraftAt=0, directCapture=false;
   let recognition=null, timer=null, speechTimer=null, quietTimer=null;
   let busy=false, speaking=false, utterance=null, networkErrors=0;
   let finalBuffer='', liveText='', hasPartial=false;
-  let lastReplyId=sessionStorage.getItem('wm-able-last-reply')||'';
+  let lastReplyId=sessionStorage.getItem('wm-able-last-reply-fresh-20261105')||'';
   const join=(...parts)=>parts.map(t=>String(t||'').trim()).filter(Boolean).join(' ');
   function chatIsActive(){
     const panel=document.querySelector('.st-key-floating_chat_panel');
@@ -892,7 +876,7 @@ export default function(component) {
     heard.textContent=liveText?'인식: '+liveText:'';
     sendButton.disabled=!enabled()||busy||speaking||!liveText.trim();
   }
-  function clearDraft(){clearTimeout(quietTimer);clearTimeout(draftTimer);finalBuffer='';liveText='';hasPartial=false;directCapture=false;publishDraft(true);showHeard()}
+  function clearDraft(notify=true){clearTimeout(quietTimer);clearTimeout(draftTimer);finalBuffer='';liveText='';hasPartial=false;directCapture=false;if(notify)publishDraft(true);else lastDraft='';showHeard()}
   function stopRecognition(){
     clearTimeout(timer);timer=null;
     if(recognition){
@@ -903,8 +887,8 @@ export default function(component) {
   }
   function stopSpeech(){
     clearTimeout(speechTimer);speechTimer=null;
-    if(utterance){utterance.onend=utterance.onerror=null;utterance=null;synth?.cancel()}
-    if(replyAudio){replyAudio.onended=replyAudio.onerror=null;replyAudio.pause();replyAudio=null;}
+    if(utterance){utterance.onstart=utterance.onend=utterance.onerror=null;utterance=null;synth?.cancel()}
+    if(replyAudio){replyAudio.onplaying=replyAudio.onended=replyAudio.onerror=null;replyAudio.pause();replyAudio=null;}
     speaking=false;
   }
   function scheduleListen(delay=180){
@@ -984,32 +968,64 @@ export default function(component) {
     };
     try{r.start()}catch(e){stopRecognition();status.textContent='마이크를 다시 연결하고 있어요…';scheduleListen(650)}
   }
-  function sayReply(){
-    stopRecognition();stopSpeech();clearDraft();
-    if(!data.speak||!data.reply||!synth){scheduleListen();return}
-    speaking=true;showHeard();status.textContent='에이블이 답변하고 있어요. 끝나면 다시 듣습니다.';
-    if(data.audio){
-      const player=new Audio('data:audio/mp3;base64,'+data.audio);replyAudio=player;
-      const finish=()=>{if(replyAudio!==player)return;replyAudio=null;speaking=false;status.textContent='마이크를 켜고 있어요…';scheduleListen();};
-      player.onended=player.onerror=finish;player.play().catch(finish);return;
+  function sayReply(force=false, snapshot=null){
+    stopRecognition();stopSpeech();clearDraft(false);
+    const reply=String(snapshot?.reply??data.reply??'');
+    const audio=snapshot?.audio??data.audio;
+    const rate=Number(snapshot?.rate??data.rate)||1;
+    if(!reply||(!force&&!data.speak)){scheduleListen();return;}
+    speaking=true;showHeard();status.textContent='음성 답변을 준비하고 있어요…';
+    const blocked='자동 음성을 시작하지 못했어요. “음성으로 듣기” 버튼을 눌러주세요.';
+    function done(message=''){
+      speaking=false;showHeard();
+      status.textContent=message||(enabled()?'답변을 마쳤어요. 다시 듣고 있어요.':'음성 답변 재생을 마쳤어요.');
+      scheduleListen();
     }
-    const u=new SpeechSynthesisUtterance(data.reply);utterance=u;u.lang='ko-KR';u.rate=Number(data.rate)||1;
-    const started=Date.now(), limit=Math.min(90000,Math.max(6000,data.reply.length*250));
-    function finish(){
-      if(!alive||utterance!==u)return;
-      clearTimeout(speechTimer);u.onend=u.onerror=null;utterance=null;speaking=false;
-      showHeard();status.textContent='마이크를 켜고 있어요…';scheduleListen();
+    function browserVoice(){
+      if(!alive)return;
+      if(!synth||typeof SpeechSynthesisUtterance==='undefined'){
+        done('음성을 재생하지 못했어요. 브라우저의 오디오 설정을 확인해 주세요.');return;
+      }
+      const u=new SpeechSynthesisUtterance(reply);utterance=u;u.lang='ko-KR';u.rate=rate;
+      const korean=(synth.getVoices?.()||[]).find(v=>String(v.lang).startsWith('ko'));
+      if(korean)u.voice=korean;
+      const started=Date.now(),limit=Math.min(180000,Math.max(12000,reply.length*300));
+      let began=false;
+      function finish(message=''){
+        if(!alive||utterance!==u)return;
+        clearTimeout(speechTimer);u.onstart=u.onend=u.onerror=null;utterance=null;done(message);
+      }
+      u.onstart=()=>{if(utterance===u){began=true;status.textContent='음성 답변을 읽고 있어요.';}};
+      u.onend=()=>finish();
+      u.onerror=event=>finish(event.error==='not-allowed'?blocked:'음성 재생에 실패했어요. “음성으로 듣기”로 다시 시도해 주세요.');
+      function checkSpeech(){
+        if(!alive||utterance!==u)return;
+        const elapsed=Date.now()-started;
+        if(!began&&elapsed>8000){synth.cancel();finish(blocked);return;}
+        if(began&&elapsed>limit){synth.cancel();finish();return;}
+        speechTimer=setTimeout(checkSpeech,300);
+      }
+      try{synth.resume?.();synth.speak(u);speechTimer=setTimeout(checkSpeech,300);}
+      catch(e){finish(blocked);}
     }
-    u.onend=u.onerror=finish;
-    function checkSpeech(){
-      if(!alive||utterance!==u)return;
-      const elapsed=Date.now()-started;
-      if(elapsed>limit){synth.cancel();finish();return}
-      if(elapsed>1200&&!synth.speaking&&!synth.pending){finish();return}
-      speechTimer=setTimeout(checkSpeech,300);
+    if(audio&&typeof Audio!=='undefined'){
+      const player=new Audio('data:audio/mp3;base64,'+audio);replyAudio=player;
+      const fallback=()=>{
+        if(!alive||replyAudio!==player)return;
+        player.onended=player.onerror=player.onplaying=null;player.pause();replyAudio=null;
+        browserVoice();
+      };
+      player.onplaying=()=>{if(replyAudio===player)status.textContent='음성 답변을 읽고 있어요.';};
+      player.onended=()=>{if(replyAudio===player){player.onplaying=player.onerror=null;replyAudio=null;done();}};
+      player.onerror=fallback;
+      try{const playing=player.play();if(playing?.catch)playing.catch(fallback);}
+      catch(e){fallback();}
+      return;
     }
-    try{synth.speak(u);speechTimer=setTimeout(checkSpeech,300)}catch(e){finish()}
+    browserVoice();
   }
+  function playReply(snapshot){sayReply(true,snapshot);}
+
   function update(next){
     const previousStage=data.stage;data=next.data||{};submit=next.setTriggerValue;report=next.setStateValue;
     startButton.textContent=data.stage==='question'?'🎙 요청 다시 듣기':'🎙 마이크 켜기';
@@ -1018,7 +1034,7 @@ export default function(component) {
       status.textContent='에이블 호출이 종료됐어요. AI 대화에서 다시 시작할 수 있어요.';return;
     }
     if(data.replyId&&data.replyId!==lastReplyId){
-      lastReplyId=data.replyId;sessionStorage.setItem('wm-able-last-reply',lastReplyId);busy=false;sayReply();
+      lastReplyId=data.replyId;sessionStorage.setItem('wm-able-last-reply-fresh-20261105',lastReplyId);busy=false;sayReply();
     }else{
       if(previousStage!==data.stage)busy=false;
       scheduleListen();showHeard();
@@ -1034,7 +1050,7 @@ export default function(component) {
   function stopReply(){
     stopSpeech();showHeard();status.textContent='음성 답변을 멈췄어요.';scheduleListen();
   }
-  const controller={root,version,update,dispose};
+  const controller={root,version,update,dispose,playReply};
   function dispose(){
     if(!alive)return;
     observer.disconnect();
@@ -1060,29 +1076,60 @@ wake_component = st.components.v2.component("work_mate_able_wake", html=VOICE_HT
 SPEECH_STOP_JS = r'''
 export default function(component){
  const root=component.parentElement.querySelector('.speech-stop-control');
- const button=root.querySelector('button'), feedback=root.querySelector('.speech-feedback');
- button.onclick=()=>{
-  window.dispatchEvent(new CustomEvent('able-stop-speech'));
-  window.speechSynthesis?.cancel();
-  document.querySelectorAll('audio').forEach(audio=>{
-   audio.pause();
-   try{audio.currentTime=0;}catch(e){}
-  });
+ const play=root.querySelector('.speech-play'),stop=root.querySelector('.speech-stop');
+ const feedback=root.querySelector('.speech-feedback'),data=component.data||{};
+ play.disabled=!data.reply;
+ function stopManualAudio(){
+  const audio=window._ableManualAudio;
+  if(audio){audio.onended=audio.onerror=null;audio.pause();window._ableManualAudio=null;}
+ }
+ function browserVoice(){
+  const synth=window.speechSynthesis;
+  if(!synth||typeof SpeechSynthesisUtterance==='undefined'){
+   feedback.textContent='브라우저에서 음성을 재생할 수 없어요.';return;
+  }
+  const u=new SpeechSynthesisUtterance(data.reply);u.lang='ko-KR';u.rate=Number(data.rate)||1;
+  window._ableManualSpeech=u;
+  u.onstart=()=>{feedback.textContent='음성 답변을 읽고 있어요.';};
+  u.onend=()=>{if(window._ableManualSpeech===u)window._ableManualSpeech=null;};
+  u.onerror=()=>{feedback.textContent='음성 재생에 실패했어요. 브라우저의 오디오 설정을 확인해 주세요.';};
+  synth.resume?.();synth.speak(u);
+ }
+ play.onclick=()=>{
+  if(!data.reply)return;
+  stopManualAudio();window.speechSynthesis?.cancel();
+  feedback.textContent='음성 재생을 요청했어요.';
+  const controller=window._workMateAbleVoice;
+  if(controller?.playReply){controller.playReply(data);return;}
+  if(data.audio&&typeof Audio!=='undefined'){
+   const audio=new Audio('data:audio/mp3;base64,'+data.audio);window._ableManualAudio=audio;
+   const fallback=()=>{if(window._ableManualAudio===audio){window._ableManualAudio=null;browserVoice();}};
+   audio.onerror=fallback;
+   try{const result=audio.play();if(result?.catch)result.catch(fallback);}catch(e){fallback();}
+  }else browserVoice();
+ };
+ stop.onclick=()=>{
+  window.dispatchEvent(new CustomEvent('able-stop-speech'));stopManualAudio();
+  window.speechSynthesis?.cancel();window._ableManualSpeech=null;
+  document.querySelectorAll('audio').forEach(audio=>{audio.pause();try{audio.currentTime=0;}catch(e){}});
   feedback.textContent='음성 답변을 멈췄어요.';
  };
- return ()=>{button.onclick=null;};
+ if(data.auto===false)feedback.textContent='자동 음성 꺼짐 · 듣기로 재생할 수 있어요.';
+ return ()=>{play.onclick=stop.onclick=null;};
 }
 '''
 SPEECH_STOP = st.components.v2.component(
     "able_stop_spoken_reply",
-    html='<div class="speech-stop-control"><button type="button" title="대화와 마이크 대기는 유지하고 음성 답변만 멈춥니다">■ 음성 답변 멈추기</button><span class="speech-feedback" role="status" aria-live="polite"></span></div>',
+    html='<div class="speech-stop-control"><button type="button" class="speech-play">▶ 음성으로 듣기</button><button type="button" class="speech-stop" title="대화와 마이크 대기는 유지하고 음성 답변만 멈춥니다">■ 음성 답변 멈추기</button><span class="speech-feedback" role="status" aria-live="polite"></span></div>',
     css='.speech-stop-control{font-family:inherit;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:3px 0}.speech-stop-control button{font:inherit;font-size:12px;color:#7663b4;background:#faf8ff;border:1px solid #e6dff5;border-radius:9px;padding:8px 12px;cursor:pointer}.speech-stop-control button:hover{background:#f0eafa}.speech-feedback{font-size:11px;color:#8e83a6}',
     js=SPEECH_STOP_JS,
 )
 
 
 def render_speech_stop(key):
-    SPEECH_STOP(data={},key=key)
+    SPEECH_STOP(data={"reply":st.session_state.get("wake_reply",""),
+        "audio":st.session_state.get("wake_audio",""),"rate":st.session_state.get("voice_speed",1.0),
+        "auto":st.session_state.get("speak_wake",True)},key=key)
 
 
 
@@ -1146,18 +1193,18 @@ def process_able(text, source="text", direct=False):
 
 
 def handle_voice_submit(item=None):
-    # 음성 이벤트를 화면 렌더링 전에 처리해 추가 재실행으로 인한 듣기 공백을 줄입니다.
+    # 콜백은 요청만 저장합니다. AI 호출은 화면을 그린 다음 수행합니다.
     if item is None:
-        voice_event = st.session_state.get("able_wake_widget", {})
-        item = voice_event.get("submit") if voice_event else None
+        event = st.session_state.get(VOICE_WIDGET_KEY, {})
+        item = event.get("submit") if event else None
     if not isinstance(item, dict):
         return
     event_id = str(item.get("id", ""))
     if event_id and event_id != st.session_state.get("last_voice_event"):
         st.session_state.last_voice_event = event_id
-        st.session_state.voice_draft = ""
-        st.session_state.clear_floating_query = True
-        process_able(item.get("text", ""), "voice", direct=item.get("direct") is True)
+        st.session_state.pending_voice_request = dict(item)
+        st.session_state.voice_draft = str(item.get("text", "")).strip()
+        st.session_state.voice_ui = "thinking"
 
 
 
@@ -1221,6 +1268,18 @@ def send_approved_email(to, subject, body):
         pass
     return result
 
+
+
+def activate_workspace():
+    """새 DB로 바뀌면 이전 회의·대화·입력 상태를 지우고 로그인만 유지합니다."""
+    marker = str(DB_FILE.resolve())
+    if st.session_state.get("_active_db_workspace") == marker:
+        return
+    keep = {"authenticated", "login_user", "remember_action", "login_id_loaded", "able_remember_id"}
+    for key in list(st.session_state):
+        if key not in keep and not str(key).startswith("able_login_"):
+            del st.session_state[key]
+    st.session_state._active_db_workspace = marker
 
 
 # ============================================================
@@ -1292,64 +1351,6 @@ def migrate_integrated_schema():
         save_setting("integrated_schema", 1)
 
 
-def import_v5_database():
-    """5차 aivle.db는 별도로 백업하고 현재 DB로 한 번만 가져옵니다."""
-    legacy = DB_FILE.parent / "aivle.db"
-    if not legacy.is_file() or legacy.resolve() == DB_FILE.resolve() or setting("v5_imported"):
-        return
-    with sqlite3.connect(str(legacy)) as src:
-        src.row_factory = sqlite3.Row
-        tables = {r[0] for r in src.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        if "tasks" not in tables:
-            return
-        if "owner" not in {r[1] for r in src.execute("PRAGMA table_info(tasks)")}:
-            return
-        backup_database(legacy, "before_import")
-        legacy_tasks = [dict(r) for r in src.execute("SELECT * FROM tasks")]
-        legacy_meetings = [dict(r) for r in src.execute("SELECT * FROM meetings")] if "meetings" in tables else []
-        mapping = {}
-        now = datetime.now(KST).isoformat()
-        with connect_db() as dst:
-            for row in legacy_meetings:
-                try:
-                    data = json.loads(row.get("result_json") or "{}")
-                    if not isinstance(data, dict):
-                        continue
-                except (ValueError, TypeError):
-                    continue
-                fingerprint = "legacy_v5_" + str(row["id"])
-                old = dst.execute("SELECT id FROM meetings WHERE fingerprint=?", (fingerprint,)).fetchone()
-                if old:
-                    mapping[str(row["id"])] = old[0]
-                    continue
-                participants = data.get("attendees") or []
-                if isinstance(participants, str):
-                    participants = [x.strip() for x in re.split(r"[,、]", participants) if x.strip()]
-                overview = {"topic":data.get("topic", ""), "participants":participants,
-                            "agenda":data.get("discussion", [])}
-                decisions = data.get("decisions", [])
-                if not isinstance(decisions, list):
-                    decisions = [str(decisions)]
-                cur = dst.execute("""INSERT INTO meetings(title,original_name,transcript,summary,decisions,
-                    created_at,meeting_date,fingerprint,overview,analysis_json) VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                    (data.get("topic") or row.get("source_name") or "이전 회의", row.get("source_name"),
-                     data.get("transcript") or data.get("original_text") or "원본 스크립트가 5차 DB에 저장되지 않았습니다.",
-                     data.get("summary") or "이전 회의 분석", json.dumps(decisions, ensure_ascii=False),
-                     row.get("created_at") or now, safe_day(data.get("date")) or (row.get("created_at") or now)[:10],
-                     fingerprint, json.dumps(overview, ensure_ascii=False), json.dumps(data, ensure_ascii=False)))
-                mapping[str(row["id"])] = cur.lastrowid
-            for row in legacy_tasks:
-                mid = mapping.get(str(row.get("meeting_id")))
-                day = safe_day(row.get("due_date"))
-                tm = safe_time(row.get("at_time"))
-                if row.get("kind") == "일정" and day:
-                    dst.execute("""INSERT INTO events(meeting_id,title,event_date,event_time,notes,created_at,assignee)
-                        VALUES (?,?,?,?,?,?,?)""", (mid,row["title"],day,tm or None,row.get("description", ""),now,row.get("owner")))
-                else:
-                    dst.execute("""INSERT INTO tasks(meeting_id,title,assignee,due_date,due_time,priority,notes,done,created_at,sort_order)
-                        VALUES (?,?,?,?,?,?,?,?,?,?)""", (mid,row["title"],row.get("owner"),day or None,tm or None,
-                        row.get("priority") or "보통",row.get("description") or "",int(bool(row.get("done"))),now,row.get("sort_order") or 0))
-            dst.execute("INSERT OR REPLACE INTO settings(key,value) VALUES ('v5_imported','true')")
 
 
 def safe_day(value):
@@ -1570,10 +1571,10 @@ def render_floating_ai():
                         st.markdown(f'<div class="empty"><img src="{asset_uri("hello")}" width="95" alt="에이블"/><br>무엇을 도와드릴까요?</div>',unsafe_allow_html=True)
                     for message in st.session_state.chat_history[-30:]:
                         render_chat_message(message)
-                    if st.session_state.get("voice_draft"):
+                    if st.session_state.get("pending_voice_request") or st.session_state.get("voice_draft"):
                         with st.chat_message("user",avatar=":material/person:"):
-                            st.caption("음성 인식 중")
-                            st.write(st.session_state.voice_draft)
+                            st.caption("에이블이 답변을 준비하고 있어요…" if st.session_state.get("pending_voice_request") else "음성 인식 중")
+                            st.write((st.session_state.get("pending_voice_request") or {}).get("text") or st.session_state.get("voice_draft", ""))
                 render_speech_stop("floating_speech_stop")
                 with st.form("floating_question",clear_on_submit=True):
                     question = st.text_input("에이블에게 질문",placeholder="예: 오늘 먼저 할 일은?",label_visibility="collapsed",key="floating_query")
@@ -1736,30 +1737,69 @@ def get_meeting_analysis(meeting):
     return data
 
 
-def render_calendar_widget(tasks, events, key, height=560):
+def render_calendar_widget(tasks, events, key, height=620):
     from streamlit_calendar import calendar as interactive_calendar
     entries = []
+    meeting_colors = {"backgroundColor":"#8c73da","borderColor":"#8c73da","textColor":"#ffffff"}
+    task_colors = {"backgroundColor":"#8caad3","borderColor":"#8caad3","textColor":"#ffffff"}
+    done_colors = {"backgroundColor":"#adc8be","borderColor":"#adc8be","textColor":"#ffffff"}
     for event in events:
         entries.append({"id":f"event_{event['id']}","title":event["title"],
-                        "start":event["event_date"]+("T"+event["event_time"] if event.get("event_time") else ""),
-                        "allDay":not bool(event.get("event_time")),"color":"#8c73da"})
+            "start":event["event_date"]+("T"+event["event_time"] if event.get("event_time") else ""),
+            "allDay":not bool(event.get("event_time")),"display":"block",**meeting_colors})
     for task in tasks:
         if task.get("due_date"):
             entries.append({"id":f"task_{task['id']}","title":("✓ " if task["done"] else "☑ ")+task["title"],
                 "start":task["due_date"]+("T"+task["due_time"] if task.get("due_time") else ""),
-                "allDay":not bool(task.get("due_time")),"color":"#adc8be" if task["done"] else "#8caad3"})
-    state = interactive_calendar(events=entries,options={"initialView":"dayGridMonth","initialDate":datetime.now(KST).date().isoformat(),
-        "locale":"ko","height":height,"fixedWeekCount":False,"dayMaxEvents":2,
+                "allDay":not bool(task.get("due_time")),"display":"block",**(done_colors if task["done"] else task_colors)})
+    calendar_css = """
+    .fc{font-family:inherit;font-size:13px;color:#26324b;background:#f6f7fc}
+    .fc .fc-toolbar.fc-header-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:0 0 16px!important}
+    .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:7px}
+    .fc .fc-toolbar-title{font-size:19px;font-weight:750;color:#26334d;margin:0;white-space:nowrap}
+    .fc .fc-button-group{display:inline-flex;flex-wrap:nowrap}
+    .fc .fc-button-primary{background:#f3efff!important;color:#7560b7!important;border:0!important;border-radius:4px;font-size:12px;padding:7px 10px;box-shadow:none!important}
+    .fc .fc-button-primary:not(:disabled).fc-button-active{background:#1a252f!important;color:#fff!important}
+    .fc .fc-button-primary:hover{background:#e9e1ff!important}
+    .fc .fc-button-primary:not(:disabled).fc-button-active:hover{background:#1a252f!important}
+    .fc .fc-scrollgrid,.fc td,.fc th{border-color:#e3e0ee!important}
+    .fc .fc-col-header-cell{background:#f6f7fc}
+    .fc .fc-col-header-cell-cushion{font-size:12px;font-weight:700;color:#26324b;padding:10px 4px}
+    .fc .fc-daygrid-day-number{font-size:12px;font-weight:500;color:#26324b;padding:8px}
+    .fc .fc-day-other .fc-daygrid-day-number{opacity:.5}
+    .fc .fc-daygrid-day-frame{min-height:95px}
+    .fc .fc-day-today{background:#f8f5ff!important}
+    .fc .fc-daygrid-event,.fc .fc-timegrid-event{border:0;border-radius:5px;padding:3px 5px;white-space:normal;font-size:12px;line-height:1.5}
+    .fc .fc-daygrid-event{margin:3px 4px}
+    .fc .fc-event-main,.fc .fc-event-title{white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+    .fc .fc-event-main{padding:0;color:inherit}
+    .fc .fc-timegrid-event .fc-event-main-frame{display:block}
+    .fc .fc-timegrid-event .fc-event-time,.fc .fc-timegrid-event .fc-event-title-container{display:inline}
+    .fc .fc-event-time{font-weight:650;margin-right:5px;font-size:12px}
+    .fc .fc-daygrid-event-dot{display:none}
+    .fc .fc-daygrid-more-link{font-size:12px;font-weight:650;color:#6044a6;padding:4px}
+    .fc .fc-popover{background:#fff;border:1px solid #d9d2ea;border-radius:10px;box-shadow:0 10px 25px #44336a22}
+    .fc .fc-popover-header{background:#f3effb;color:#4f3a83;padding:9px}
+    """
+    state = interactive_calendar(events=entries,options={"initialView":"dayGridMonth",
+        "initialDate":datetime.now(KST).date().isoformat(),"locale":"ko","firstDay":0,
+        "height":height,"fixedWeekCount":False,"dayMaxEvents":4,"moreLinkText":"더 보기",
+        "eventDisplay":"block","displayEventTime":True,
+        "eventTimeFormat":{"hour":"2-digit","minute":"2-digit","hour12":False},
         "headerToolbar":{"left":"prev,next today","center":"title","right":"dayGridMonth,timeGridWeek,listWeek"},
         "buttonText":{"today":"오늘","month":"월","week":"주","list":"목록"}},
-        custom_css=".fc{font-family:inherit;font-size:11px}.fc .fc-toolbar-title{font-size:16px}.fc .fc-button-primary{background:#f3efff;border:0;color:#7560b7}.fc .fc-day-today{background:#f8f5ff}.fc-event{border:0;border-radius:5px;padding:2px}.fc td,.fc th{border-color:#ece9f5}",
-        callbacks=["eventClick","dateClick"],key=key)
+        custom_css=calendar_css,callbacks=["eventClick","dateClick"],key=key)
     if state and state.get("callback")=="eventClick":
         selected = state.get("eventClick",{}).get("event",{}).get("id", "")
         collection = tasks if selected.startswith("task_") else events
-        row = next((x for x in collection if selected.endswith("_"+str(x["id"]))),None)
+        row = next((x for x in collection if selected==("task_" if selected.startswith("task_") else "event_")+str(x["id"])),None)
         if row:
-            st.info(f"{row['title']} · 담당 {row.get('assignee') or '확인 필요'} · {row.get('due_date') or row.get('event_date')} {row.get('due_time') or row.get('event_time') or ''}")
+            detail=f"{row['title']} · 담당 {row.get('assignee') or '확인 필요'} · {row.get('due_date') or row.get('event_date')} {row.get('due_time') or row.get('event_time') or ''}"
+            if selected.startswith("task_"):
+                detail+=f" · 중요도 {row.get('priority') or '보통'} · {'완료' if row.get('done') else '미완료'}"
+            if row.get("notes"):
+                detail+=" · "+row["notes"]
+            st.info(detail)
     if state and state.get("callback")=="dateClick":
         day = state.get("dateClick",{}).get("dateStr", "")[:10]
         st.caption(day+" 일정")
@@ -1827,6 +1867,7 @@ JSON 객체 {{"display_text":"읽기 쉬운 Markdown 답변","speech_text":"자�
 # 7. 로그인 후 공통 화면 초기화
 # ============================================================
 st.markdown(APP_CSS,unsafe_allow_html=True)
+activate_workspace()
 if not st.session_state.get("authenticated",False):
     render_login()
     st.stop()
@@ -1835,10 +1876,6 @@ if st.session_state.get("remember_action"):
 
 init_db()
 migrate_integrated_schema()
-try:
-    import_v5_database()
-except (sqlite3.DatabaseError,ValueError,TypeError,KeyError) as exc:
-    st.warning(f"이전 5차 데이터 가져오기를 완료하지 못했어요. 원본 DB와 백업은 유지됩니다. ({type(exc).__name__})")
 if "my_name" not in st.session_state:
     st.session_state.my_name = setting("my_name",os.getenv("APP_DISPLAY_NAME") or "김대리")
 for key,default in {"page":"home","chat_history":[],"wake_stage":"wake","wake_reply":"","wake_reply_id":"",
@@ -1855,13 +1892,13 @@ if st.session_state.pop("clear_floating_query",False):
     st.session_state.floating_query = ""
 
 def handle_voice_status():
-    value = st.session_state.get("able_wake_widget")
+    value = st.session_state.get(VOICE_WIDGET_KEY)
     value = value.get("voice_status") if value else None
     if value in ("idle","listening","thinking","speaking","off"):
         st.session_state.voice_ui = value
 
 def handle_voice_draft():
-    event = st.session_state.get("able_wake_widget", {})
+    event = st.session_state.get(VOICE_WIDGET_KEY, {})
     draft = event.get("voice_draft") if event else None
     if not isinstance(draft, str):
         return
@@ -1897,7 +1934,7 @@ with st.sidebar:
     with st.container(key="navgroup_voice"):
         st.caption("ABLE ASSISTANT")
         render_voice_status()
-        voice_event = wake_component(key="able_wake_widget",data={"stage":st.session_state.wake_stage,
+        voice_event = wake_component(key=VOICE_WIDGET_KEY,data={"stage":st.session_state.wake_stage,
             "reply":st.session_state.wake_reply,"replyId":st.session_state.wake_reply_id,"speak":st.session_state.speak_wake,
             "audio":st.session_state.wake_audio,"rate":st.session_state.voice_speed,"chatFocused":st.session_state.page=="chat"},
             on_submit_change=handle_voice_submit,on_voice_status_change=handle_voice_status,on_voice_draft_change=handle_voice_draft)
@@ -1938,7 +1975,7 @@ if page == "home":
         with st.container(key="card_home_calendar"):
             st.markdown("### 월간 캘린더")
             st.caption("보라색 · 회의 일정 / 파란색 · 업무 마감")
-            render_calendar_widget(all_tasks,all_events,"home_calendar",height=565)
+            render_calendar_widget(all_tasks,all_events,"home_calendar",height=620)
     with right:
         with st.container(key="card_home_tasks"):
             title,link = st.columns([3,1.5])
@@ -2181,29 +2218,8 @@ elif page == "calendar":
         st.markdown(f'<img src="{asset_uri("calendar")}" alt="달력을 든 에이블" style="float:right;width:85px;height:85px;object-fit:contain"/>',unsafe_allow_html=True)
         st.markdown('### ▣ 스마트 캘린더')
         st.caption("회의 일정과 업무 마감일을 함께 표시합니다.")
-        from streamlit_calendar import calendar as interactive_calendar
-        events=[]
-        for event in all_events:
-            start=event["event_date"]+("T"+event["event_time"] if event.get("event_time") else "")
-            events.append({"id":f"event_{event['id']}","title":event["title"],"start":start,"allDay":not bool(event.get("event_time")),"backgroundColor":"#f0edff","borderColor":"#f0edff","textColor":"#7564ed"})
-        for task in all_tasks:
-            if task.get("due_date"):
-                events.append({"id":f"task_{task['id']}","title":("✓ " if task["done"] else "☑ ")+task["title"],"start":task["due_date"]+("T"+task["due_time"] if task.get("due_time") else ""),"allDay":not bool(task.get("due_time")),"backgroundColor":"#fff2e7" if not task["done"] else "#edf5f0","borderColor":"#fff2e7" if not task["done"] else "#edf5f0","textColor":"#ca925a" if not task["done"] else "#8fa99b"})
-        st.markdown('<div class="legend">🟣 회의/일정　 🟠 업무 마감일</div>',unsafe_allow_html=True)
-        calendar_css=""".fc{font-family:inherit;color:#26324b}.fc .fc-toolbar-title{font-size:1.05rem;font-weight:750}.fc .fc-button-primary{background:white!important;color:#7569db!important;border:1px solid #e1e4f3!important;border-radius:9px!important;box-shadow:none!important}.fc .fc-button-primary:disabled{opacity:.5}.fc .fc-daygrid-day-number{color:#8293af;font-size:11px;padding:9px}.fc .fc-col-header-cell-cushion{color:#a2afc4;font-size:10px;padding:10px}.fc .fc-scrollgrid,.fc td,.fc th{border-color:#e8edf6!important}.fc .fc-daygrid-day{min-height:100px}.fc .fc-day-today{background:#fbfaff!important}.fc .fc-day-today .fc-daygrid-day-number{background:#625afa;color:white;border-radius:50%;width:25px;height:25px;padding:3px 0;margin:5px}.fc .fc-event{border-radius:5px;font-size:10px;margin:3px 4px;padding:3px}.fc .fc-toolbar{margin-bottom:18px!important}"""
-        state=interactive_calendar(events=events, options={"initialView":"dayGridMonth","initialDate":today.isoformat(),"locale":"ko","firstDay":0,"height":650,"fixedWeekCount":False,"dayMaxEvents":3,"headerToolbar":{"left":"","center":"","right":"prev title next today"},"buttonText":{"today":"오늘"}},custom_css=calendar_css,callbacks=["eventClick","dateClick"],key="work_mate_calendar")
-        if state and state.get("callback")=="eventClick":
-            item=state.get("eventClick",{}).get("event",{});identifier=item.get("id","")
-            if identifier.startswith("task_"):
-                task=next((t for t in all_tasks if str(t["id"])==identifier[5:]),None)
-                if task:st.info(f"{task['title']} · 담당 {task['assignee']} · 마감 {task['due_date']} · {'완료' if task['done'] else '미완료'}")
-            elif identifier.startswith("event_"):
-                event=next((e for e in all_events if str(e["id"])==identifier[6:]),None)
-                if event:st.info(f"{event['title']} · {event['event_date']} {event['event_time'] or ''} · 담당 {event.get('assignee') or '담당자 확인 필요'} · {event['notes'] or ''}")
-        if state and state.get("callback")=="dateClick":
-            selected=state.get("dateClick",{}).get("dateStr","")[:10]
-            st.markdown(f"#### {esc(selected)} 일정")
-            render_schedule([e for e in all_events if e["event_date"]==selected])
+        st.markdown('<div class="legend">🟣 회의/일정　 🔵 업무 마감일　 🟢 완료 업무</div>',unsafe_allow_html=True)
+        render_calendar_widget(all_tasks,all_events,"work_mate_calendar",height=730)
         with st.expander("＋ 일정 직접 추가"):
             with st.form("add_event"):
                 title=st.text_input("일정 이름")
@@ -2229,10 +2245,10 @@ elif page == "chat":
                     st.session_state.wake_stage="wake";st.rerun()
             for item in st.session_state.chat_history:
                 render_chat_message(item)
-            if st.session_state.get("voice_draft"):
+            if st.session_state.get("pending_voice_request") or st.session_state.get("voice_draft"):
                 with st.chat_message("user",avatar=":material/person:"):
-                    st.caption("음성 인식 중")
-                    st.write(st.session_state.voice_draft)
+                    st.caption("에이블이 답변을 준비하고 있어요…" if st.session_state.get("pending_voice_request") else "음성 인식 중")
+                    st.write((st.session_state.get("pending_voice_request") or {}).get("text") or st.session_state.get("voice_draft", ""))
             render_speech_stop("chat_speech_stop")
             prompt=st.chat_input("예: 에이블, 오늘 가장 먼저 해야 할 일이 뭐야?")
             if prompt:
@@ -2394,7 +2410,7 @@ elif page == "email":
     with right:
         with st.container(key="card_email_contacts"):
             st.markdown('### 주소록')
-            st.caption("기본 연락처 6개는 시연용 예시입니다. 실제 발송 전 이메일 주소를 확인해 주세요.")
+            st.caption("직원 명단 CSV를 올리거나 연락처를 직접 등록해 주세요.")
             st.caption("등록한 연락처는 다시 실행해도 유지돼요. 같은 주소를 등록하면 이름·부서를 수정합니다.")
             with st.form("email_contact_form",clear_on_submit=True):
                 department=st.text_input("부서명",placeholder="예: 인사팀",key="contact_department")
@@ -2517,3 +2533,13 @@ if voice_event and voice_event.get("submit"):
     if str(item.get("id",""))!=st.session_state.get("last_voice_event"):
         handle_voice_submit(item)
         st.rerun()
+
+
+# 페이지와 빠른 대화창을 먼저 갱신한 뒤 AI 요청을 처리합니다.
+queued_voice = st.session_state.pop("pending_voice_request", None)
+if queued_voice:
+    with st.spinner("에이블이 답변을 준비하고 있어요…"):
+        process_able(queued_voice.get("text", ""), "voice", direct=queued_voice.get("direct") is True)
+    st.session_state.voice_draft = ""
+    st.session_state.clear_floating_query = True
+    st.rerun()
