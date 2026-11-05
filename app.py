@@ -914,11 +914,11 @@ def show_meeting_script(meeting):
 # ============================================================
 # 5. '에이블' 호출과 브라우저 음성 인식 컴포넌트
 # ============================================================
-VOICE_HTML = '<div class="wake-box"><div class="wake-head">✦ 에이블 호출</div><div class="wake-buttons"><button class="start" type="button">🎙 마이크 켜기</button><button class="stop" type="button" title="마이크 중지" aria-label="마이크 중지">중지</button></div><div class="status" role="status" aria-live="polite">마이크를 켠 뒤 ‘에이블’이라고 불러주세요.</div><div class="heard"></div><button class="send" type="button" hidden disabled>말한 내용 보내기</button><div class="wake-reply-controls" hidden><button class="replay" type="button">▶ 다시 듣기</button><button class="reply-stop" type="button">■ 음성 멈추기</button></div></div>'
-VOICE_CSS = '.wake-box{box-sizing:border-box;width:100%;min-width:0;background:#f7f6ff;border:1px solid #e7e3ff;border-radius:12px;padding:10px;font-family:inherit}\n.wake-box [hidden]{display:none!important}\n.wake-head{font-size:11px;font-weight:800;color:#5c54df;margin-bottom:8px}\n.wake-buttons,.wake-reply-controls{display:flex;align-items:center;gap:5px;min-width:0}\n.wake-box button{box-sizing:border-box;white-space:nowrap;word-break:keep-all;border:1px solid #e0dcfa;background:white;color:#6a62d8;border-radius:7px;padding:7px 5px;font-family:inherit;font-size:10px;line-height:1.4;cursor:pointer;min-width:0}\n.wake-buttons .start{background:#625afa;color:white;border-color:#625afa;flex:1 1 auto}\n.wake-buttons .stop{flex:0 0 38px}\n.wake-box>.send{width:100%;margin-top:6px}\n.wake-box button:disabled{opacity:.45;cursor:default}\n.wake-reply-controls{margin-top:7px}\n.wake-reply-controls button{flex:1 1 0}\n.wake-box .status{font-size:10px;line-height:1.65;color:#7b87a3;margin-top:7px;word-break:keep-all;overflow-wrap:anywhere}\n.wake-box .heard{font-size:10px;line-height:1.6;color:#6c7399;max-height:60px;overflow:auto;margin-top:3px;overflow-wrap:anywhere}\n'
+VOICE_HTML = '<div class="wake-box"><div class="wake-buttons"><button class="start" type="button">🎙 마이크 켜기</button><button class="stop" type="button" aria-label="마이크와 음성 중지">■ 중지</button></div><div class="status" role="status" aria-live="polite">마이크가 꺼져 있어요.</div><div class="heard"></div><button class="send" type="button" hidden disabled>말한 내용 보내기</button><div class="wake-reply-controls" hidden><button class="replay" type="button">▶ 다시 듣기</button><button class="reply-stop" type="button">■ 음성 멈추기</button></div></div>'
+VOICE_CSS = '.wake-box{box-sizing:border-box;width:100%;min-width:0;background:transparent;padding:4px 0;font-family:inherit}\n.wake-box [hidden]{display:none!important}\n.wake-buttons{display:flex;align-items:center;gap:7px;min-width:0}\n.wake-box button{box-sizing:border-box;white-space:nowrap;word-break:keep-all;border:1px solid #e0dcfa;background:white;color:#6a62d8;border-radius:8px;padding:8px 8px;font-family:inherit;font-size:11px;line-height:1.4;cursor:pointer;min-width:0}\n.wake-buttons .start{background:#625afa;color:white;border-color:#625afa;flex:1 1 0}\n.wake-buttons .stop{flex:0 0 59px}\n.wake-box .status,.wake-box .heard{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}\n.wake-box>.send,.wake-reply-controls{display:none!important}\n'
 VOICE_JS = r"""
 export default function(component) {
-  const root=component.parentElement.querySelector('.wake-box'), version='integrated-voice-9-sidebar-briefing';
+  const root=component.parentElement.querySelector('.wake-box'), version='integrated-voice-10-simplified-mic-autovoice';
   const previous=root._ableVoice||window._workMateAbleVoice;
   if(previous?.root===root&&previous.version===version){previous.update(component);return previous.dispose}
   previous?.dispose();
@@ -1129,14 +1129,14 @@ export default function(component) {
 
   function update(next){
     const previousStage=data.stage;data=next.data||{};submit=next.setTriggerValue;report=next.setStateValue;
-    startButton.textContent=data.stage==='question'?'🎙 요청 다시 듣기':'🎙 마이크 켜기';
+    startButton.textContent='🎙 마이크 켜기';
     const newReply=Boolean(data.replyId&&data.replyId!==lastReplyId);
     function deliverReply(){
       lastReplyId=data.replyId;sessionStorage.setItem('wm-able-last-reply-fresh-20261105',lastReplyId);busy=false;sayReply(Boolean(data.forceSpeak));
     }
     if(data.stage==='off'){
       sessionStorage.removeItem(storeKey);busy=false;stopRecognition();if(previousStage!=='off')stopSpeech();clearDraft();
-      if(newReply&&data.forceSpeak)deliverReply();
+      if(newReply)deliverReply();
       else if(!speaking)status.textContent='마이크가 꺼져 있어요. 필요할 때 마이크 켜기를 눌러주세요.';
       showHeard();return;
     }
@@ -1203,7 +1203,7 @@ export default function(component){
  const input=component.data||{};
  const text=String(input.text||'').trim(),rate=Number(input.rate)||1;
  const owner=window._ableHomeBriefing;
- if(owner?.stop)owner.stop();
+ if(owner?.active&&owner?.stop)owner.stop();
  let active=false,utterance=null,watchdog=null,index=0,stalledAt=0;
  function splitSpeech(content){
    const sentences=content.replace(/\n+/g,' ').match(/[^.!?。！？]+[.!?。！？]?/g)||[content];
@@ -1253,7 +1253,7 @@ export default function(component){
    window._ableHomeBriefing?.stop?.();
    window._workMateAbleVoice?.beginExternalBriefing?.();
    synth.cancel();active=true;index=0;refresh();hint.textContent='브리핑 재생 중…';
-   window._ableHomeBriefing={stop};
+   window._ableHomeBriefing={stop,get active(){return active;}};
    next();
    // Chrome의 긴 문장 음성 합성 중단을 방지: 100자 이하 구간마다 이어 읽습니다.
    watchdog=setInterval(()=>{
@@ -1266,7 +1266,7 @@ export default function(component){
  }
  play.onclick=()=>{if(active)finish('브리핑 재생을 멈췄어요.');else start();};
  refresh();
- return ()=>{play.onclick=null;if(window._ableHomeBriefing?.stop===stop)stop();};
+ return ()=>{play.onclick=null;if(active&&window._ableHomeBriefing?.stop===stop)stop();};
 }
 """
 HOME_BRIEFING_PLAYER = st.components.v2.component(
@@ -1337,17 +1337,25 @@ def render_speech_stop(key):
 
 MIC_CONTROLS = st.components.v2.component(
     "able_floating_microphone_controls",
-    html='<div class="able-mic-controls"><button type="button" class="mic-start">🎙 마이크 켜기</button><button type="button" class="mic-stop">마이크 중지</button><span class="mic-feedback" role="status"></span></div>',
-    css='.able-mic-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-family:inherit}.able-mic-controls button{white-space:nowrap;border:1px solid #e0dafa;border-radius:8px;padding:7px 10px;font-size:11px;cursor:pointer;background:#fff;color:#7560b7}.able-mic-controls .mic-start{background:#625afa;border-color:#625afa;color:#fff}.mic-feedback{font-size:10px;color:#8e83a6}',
+    html='<div class="able-mic-controls"><button type="button" class="mic-start">🎙 마이크 켜기</button><button type="button" class="mic-stop">■ 중지</button></div>',
+    css='.able-mic-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:inherit}.able-mic-controls button{white-space:nowrap;border:1px solid #e0dafa;border-radius:9px;padding:8px 13px;font-size:12px;cursor:pointer;background:#fff;color:#7560b7}.able-mic-controls .mic-start{background:#625afa;border-color:#625afa;color:#fff;flex:1 1 auto}.able-mic-controls .mic-stop{flex:0 0 auto}',
     js='''export default function(component){
       const root=component.parentElement.querySelector('.able-mic-controls');
-      const start=root.querySelector('.mic-start'),stop=root.querySelector('.mic-stop'),feedback=root.querySelector('.mic-feedback');
+      const start=root.querySelector('.mic-start'),stop=root.querySelector('.mic-stop');
       start.onclick=()=>{
         const controller=window._workMateAbleVoice;
-        if(controller?.start){controller.start();feedback.textContent='‘에이블’이라고 불러주세요.';}
-        else feedback.textContent='음성 기능을 준비하고 있어요. 잠시 후 다시 눌러주세요.';
+        if(controller?.start){controller.start();start.title='마이크가 켜졌어요. 에이블이라고 불러주세요.';}
+        else start.title='마이크 연결을 확인해 주세요.';
       };
-      stop.onclick=()=>{window._workMateAbleVoice?.stop();feedback.textContent='마이크를 중지했어요.';};
+      stop.onclick=()=>{
+        window._workMateAbleVoice?.stop?.();
+        window.dispatchEvent(new CustomEvent('able-stop-speech'));
+        window._ableHomeBriefing?.stop?.();
+        window.speechSynthesis?.cancel();
+        const audio=window._ableManualAudio;
+        if(audio){audio.pause();window._ableManualAudio=null;}
+        stop.title='마이크와 음성 답변을 중지했어요.';
+      };
       return ()=>{start.onclick=stop.onclick=null;};
     }''',
 )
@@ -1864,9 +1872,7 @@ def render_floating_ai():
                         st.markdown(f'<div class="empty"><img src="{asset_uri("hello")}" width="95" alt="에이블"/><br>무엇을 도와드릴까요?</div>',unsafe_allow_html=True)
                     for message in st.session_state.chat_history[-30:]:
                         render_chat_message(message)
-                    render_voice_status()
                 render_microphone_controls("floating_microphone")
-                render_speech_stop("floating_speech_stop")
                 with st.form("floating_question",clear_on_submit=True):
                     question = st.text_input("에이블에게 질문",placeholder="예: 오늘 먼저 할 일은?",label_visibility="collapsed",key="floating_query")
                     send = st.form_submit_button("에이블에게 물어보기",type="primary",use_container_width=True)
@@ -3377,9 +3383,7 @@ elif page == "chat":
             st.markdown(f'<div class="chat-welcome"><img src="{robot_uri()}" alt="에이블"/><div><h2>안녕하세요, 저는 에이블이에요.</h2><p>‘에이블’이라고 부르거나 궁금한 내용을 입력해 주세요.<br>오늘의 업무와 회의 내용을 함께 정리해 드릴게요.</p></div></div>',unsafe_allow_html=True)
             for item in st.session_state.chat_history:
                 render_chat_message(item)
-            render_voice_status()
             render_microphone_controls("chat_microphone")
-            render_speech_stop("chat_speech_stop")
             prompt=st.chat_input("예: 에이블, 오늘 가장 먼저 해야 할 일이 뭐야?")
             if prompt:
                 with st.spinner("에이블이 답변하고 있어요…"):process_able(prompt,"text")
@@ -3467,7 +3471,7 @@ elif page == "archive":
 
 elif page == "email":
     render_header("이메일 관리","TOOLS / EMAIL")
-    inbox_tab,compose_tab=st.tabs(["받은 메일","메일 작성·주소록"],default=st.session_state.get("email_default_tab","받은 메일"))
+    compose_tab,inbox_tab=st.tabs(["메일 작성·주소록","받은 메일"],default=st.session_state.get("email_default_tab","메일 작성·주소록"))
     with inbox_tab:
         render_inbox_page()
     with compose_tab:
