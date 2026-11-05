@@ -31,6 +31,9 @@ from email.utils import parseaddr, parsedate_to_datetime
 from html.parser import HTMLParser
 from datetime import date, datetime, timedelta
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -94,6 +97,7 @@ def get_client():
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY가 없습니다. api_key.txt 또는 Streamlit secrets에 등록하세요.")
     return OpenAI(timeout=90,max_retries=1)
+
 
 
 # ============================================================
@@ -377,6 +381,7 @@ def save_analysis(title, source_name, transcript, analysis, tasks, events, meeti
 
 
 
+
 # ============================================================
 # 2. OpenAI API 호출
 # ============================================================
@@ -473,26 +478,48 @@ def text_to_speech(text):
 
 
 
-def send_email(to, subject, body):
-    """Gmail SMTP로 이메일을 전송합니다."""
-    sender = os.getenv("GMAIL_ADDRESS")
-    password = os.getenv("GMAIL_APP_PASSWORD")
+def send_email(to, subject, body, attachment=None, html_body=None):
+    """Gmail SMTP: 일반 본문·HTML 표·TXT/PDF 첨부를 지원합니다.
+
+    attachment=(filename, bytes, mime_type) 또는 None.
+    발송하려면 명시적인 버튼 클릭이나 사용자의 직접적인 발송 요청이 필요합니다.
+    """
+    sender = os.getenv("GMAIL_ADDRESS", "").strip()
+    password = os.getenv("GMAIL_APP_PASSWORD", "").strip()
     if not sender or not password:
-        return {"status": "failed", "error": "Gmail 주소와 앱 비밀번호를 확인하세요."}
-    if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", to) or "\n" in subject or "\r" in subject:
-        return {"status": "failed", "error": "수신자 주소와 제목을 확인하세요."}
+        return {"status":"failed", "error":"Gmail 주소와 앱 비밀번호를 확인하세요."}
+    if (not valid_email(to) or not subject.strip() or not body.strip()
+            or any(char in subject for char in "\r\n") or len(body)>2_000_000):
+        return {"status":"failed", "error":"수신자·제목·본문을 확인하세요."}
     try:
-        msg = MIMEText(body, "plain", "utf-8")
+        msg = MIMEMultipart("mixed")
         msg["Subject"] = subject
         msg["From"] = sender
         msg["To"] = to
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as s:
-            s.starttls(context=ssl.create_default_context())
-            s.login(sender, password)
-            s.sendmail(sender, to, msg.as_string())
-        return {"status": "success"}
-    except Exception as e:
-        return {"status": "failed", "error": str(e)}
+        content = MIMEMultipart("alternative")
+        content.attach(MIMEText(body, "plain", "utf-8"))
+        if html_body:
+            content.attach(MIMEText(html_body, "html", "utf-8"))
+        msg.attach(content)
+        if attachment is not None:
+            filename, data, mime_type = attachment
+            if not isinstance(data, bytes) or len(data)>15*1024*1024:
+                raise ValueError("첨부파일은 15MB 이하로 생성해 주세요.")
+            if mime_type not in ("application/pdf", "text/plain"):
+                raise ValueError("PDF 또는 TXT 첨부만 지원합니다.")
+            main, sub = mime_type.split("/", 1)
+            part=MIMEBase(main,sub)
+            part.set_payload(data)
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", "attachment", filename=filename)
+            msg.attach(part)
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as smtp:
+            smtp.starttls(context=ssl.create_default_context())
+            smtp.login(sender, password)
+            smtp.send_message(msg, from_addr=sender, to_addrs=[to])
+        return {"status":"success"}
+    except Exception as exc:
+        return {"status":"failed", "error":str(exc)}
 
 
 
@@ -687,6 +714,7 @@ def briefing_text(tasks, events, day=None):
 
 
 
+
 # ============================================================
 # 4. 화면 공통 스타일: 첨부 AI WORK MATE 디자인
 # ============================================================
@@ -749,7 +777,7 @@ h2{font-size:19px!important;letter-spacing:-.45px}h3{font-size:15px!important;le
 @media(max-width:900px){.block-container{padding:4.5rem 1rem 1.3rem}.statrow{grid-template-columns:repeat(2,1fr);gap:10px}.hero-robot{width:110px;opacity:.6}.hero-copy{width:90%}.cal-cell{min-height:82px;padding:4px}.cal-item{font-size:8px}.topline h1{font-size:21px!important}.topright{gap:5px}[class*="st-key-card_"]{padding:16px}}
 
 .hero-briefing{position:relative;z-index:1;margin:16px 0;color:#eef0ff;font-size:12px;line-height:1.9;max-width:100%;background:#ffffff0d;border-radius:12px;padding:12px 14px}
-.st-key-hero .hero-robot{right:12px;top:10px;width:145px}.st-key-hero .hero-copy{width:75%}
+.st-key-hero .hero-robot{right:12px;top:10px;width:145px}.st-key-hero .hero-copy{width:82%}
 .recommend-robot{float:right;width:70px;height:70px;object-fit:contain}.recommend-title{clear:both;margin:16px 0}
 .voice-state{display:flex;align-items:center;gap:9px;padding:8px 3px}.voice-state img{width:42px;height:50px;object-fit:contain;flex-shrink:0}.voice-state>div{min-width:0;flex:1}.voice-state b{font-size:12px;color:#7463b2}.voice-state small{display:block;color:#9a91b0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.voice-dot{flex-shrink:0;width:7px;height:7px;background:#b5a6d7;border-radius:50%;margin-left:auto}.voice-dot.listening{background:#80b9a9}.voice-dot.thinking,.voice-dot.speaking{animation:ablepulse 1s infinite}
 @keyframes ablepulse{50%{opacity:.3;transform:scale(1.3)}}
@@ -786,7 +814,12 @@ def navigate(page):
 
 def render_header(title, breadcrumb):
     mode = "AI WORK MATE"
-    st.markdown(f'<div class="topline"><div><div class="eyebrow">{esc(breadcrumb)}</div><h1>{esc(title)}</h1></div><div class="topright"><span class="mode-tag">✦ {mode}</span><span class="avatar">AI</span></div></div>', unsafe_allow_html=True)
+    caption_col,shortcut_col=st.columns([5,1.55],vertical_alignment="center")
+    with caption_col:
+        st.markdown(f'<div class="topline"><div><div class="eyebrow">{esc(breadcrumb)}</div><h1>{esc(title)}</h1></div></div>',unsafe_allow_html=True)
+    with shortcut_col:
+        if st.button("✦ AI WORK MATE  ● AI",key="header_ai_shortcut",use_container_width=True,help="에이블과의 대화 열기"):
+            navigate("chat")
 
 
 def task_badge(task):
@@ -972,6 +1005,7 @@ def show_meeting_script(meeting):
     st.caption(f"{meeting['title']} · {meeting.get('meeting_date') or '날짜 미정'}")
     with st.container(height=560,border=True):
         render_transcript(meeting["transcript"],max_lines=None)
+
 
 
 
@@ -1527,10 +1561,10 @@ def process_able(text, source="text", direct=False):
             else:
                 try:
                     st.session_state.voice_ui = "thinking"
-                    answer = assistant_answer(command)
+                    answer = chat_meeting_mail_request(command) or assistant_answer(command)
                     if isinstance(answer, dict):
                         reply = answer["display_text"]
-                        speech_text = answer["speech_text"]
+                        speech_text = answer.get("speech_text") or make_speech_text(reply)
                     else:
                         reply = str(answer)
                 except Exception as exc:
@@ -1626,29 +1660,22 @@ JSON 객체 {"subject":"제목","body":"본문"}만 반환하세요.
     return draft
 
 
-def send_approved_email(to, subject, body):
-    # 도구 정의 → 함수 호출 → 실행 결과 전달
-    fingerprint = hashlib.sha256((to+subject+body).encode()).hexdigest()
-    if st.session_state.get("email_sent_key") == fingerprint:
+def send_approved_email(to, subject, body, attachment=None, html_body=None):
+    """폼에서 사용자 발송 승인이 완료된 메일만 전송합니다.
+
+    이 시점에는 LLM의 추가 도구 호출이 필요하지 않으므로 SMTP를 직접 호출합니다.
+    """
+    attachment_digest=hashlib.sha256(attachment[1]).hexdigest() if attachment else ""
+    fingerprint=hashlib.sha256((to+subject+body+attachment_digest+(html_body or "")).encode()).hexdigest()
+    if st.session_state.get("email_sent_key")==fingerprint:
         return {"status":"already_sent"}
-    if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+",to) or not subject.strip() or not body.strip() or any(c in subject for c in "\r\n"):
+    if not valid_email(to) or not subject.strip() or not body.strip() or any(c in subject for c in "\r\n"):
         raise ValueError("수신자·제목·본문을 확인하세요.")
-    email_tools = [{"type":"function","name":"send_email","description":"사용자가 검토하고 발송 승인한 이메일 한 통을 보냅니다.","parameters":{"type":"object","properties":{"to":{"type":"string"},"subject":{"type":"string"},"body":{"type":"string"}},"required":["to","subject","body"],"additionalProperties":False},"strict":True}]
-    client = get_client()
-    response = client.responses.create(model=MODEL,input=[{"role":"system","content":"사용자가 승인한 이메일을 보내기 위해 send_email 도구를 한 번 호출하세요."},{"role":"user","content":json.dumps({"to":to,"subject":subject,"body":body},ensure_ascii=False)}], tools=email_tools, tool_choice={"type":"function","name":"send_email"}, parallel_tool_calls=False)
-    tool_calls = [item for item in response.output if item.type == "function_call"]
-    if len(tool_calls) != 1 or tool_calls[0].name != "send_email":
-        raise ValueError("이메일 도구 호출을 확인할 수 없습니다.")
-    # 실제 수신자와 본문은 사용자가 승인한 폼 값을 사용합니다.
-    result = send_email(to, subject, body)
-    if result["status"] == "success":
-        st.session_state.email_sent_key = fingerprint
-    try:
-        client.responses.create(model=MODEL, previous_response_id=response.id, input=[{"type":"function_call_output","call_id":tool_calls[0].call_id,"output":json.dumps(result,ensure_ascii=False)}])
-    except Exception:
-        # SMTP 성공 여부는 이미 확정됐으므로 후속 응답 실패로 재발송하지 않습니다.
-        pass
+    result=send_email(to,subject,body,attachment=attachment,html_body=html_body)
+    if result.get("status")=="success":
+        st.session_state.email_sent_key=fingerprint
     return result
+
 
 
 
@@ -1874,18 +1901,181 @@ def analysis_mail(title, meeting_date, result, tasks):
     return {"subject":f"[회의 요약 및 내 업무] {title}", "body":"\n".join(lines)}
 
 
-def send_analysis_to_self(title, meeting_date, result, tasks):
+def meeting_report_data(title, meeting_date, analysis, tasks):
+    """화면의 render_meeting_summary와 동일한 분석 데이터에서 문서용 표를 구성합니다."""
+    analysis = analysis or {}
+    sections = [
+      ("회의 정보", [("회의명",title or "확인 필요"), ("회의 날짜",meeting_date or "확인 필요"),
+                    ("참석자"," · ".join(analysis.get("participants") or []) or "확인 필요"),
+                    ("핵심 요약",analysis.get("summary") or "저장된 요약 없음")]),
+    ]
+    for heading,field in (("주요 논의","discussion"),("결정 사항","decisions"),("확인할 사항","pending")):
+        entries=analysis.get(field) or (analysis.get("agenda") if field=="discussion" else []) or []
+        sections.append((heading,[(str(i),str(v)) for i,v in enumerate(entries,1)] or [("-","내용 없음")]))
+    item_rows=[]
+    for item in tasks or []:
+        deadline=" ".join(str(v) for v in (item.get("due_date"),item.get("due_time")) if v) or "기한 확인 필요"
+        item_rows.append((str(item.get("title") or ""),str(item.get("assignee") or "담당자 확인 필요"),deadline,
+                          str(item.get("priority") or "보통"),"완료" if item.get("done") else "미완료"))
+    return sections, item_rows
+
+
+def meeting_report_html(title, meeting_date, analysis, tasks):
+    sections, rows = meeting_report_data(title,meeting_date,analysis,tasks)
+    style = "body{font-family:sans-serif;color:#24314d;line-height:1.65}h1{font-size:23px}h2{font-size:16px;margin:22px 0 8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #dfe4ed;padding:9px;text-align:left;vertical-align:top}th{background:#f1efff}"
+    fragments=[f'<html><head><meta charset="utf-8"><style>{style}</style></head><body>',
+               f'<h1>{esc(title)} · 회의록</h1>']
+    for heading,pairs in sections:
+        fragments.extend((f'<h2>{esc(heading)}</h2>',table_html(["항목","내용"],pairs)))
+    fragments.extend(('<h2>담당 업무</h2>',table_html(["업무","담당자","마감","중요도","상태"], rows or [("등록 업무 없음","-","-","-","-")])))
+    fragments.append('</body></html>')
+    return "\n".join(fragments)
+
+
+def meeting_report_text(title, meeting_date, analysis, tasks):
+    sections,rows=meeting_report_data(title,meeting_date,analysis,tasks)
+    lines=[f'회의록 - {title}']
+    for heading,pairs in sections:
+        lines.extend(['',f'[{heading}]'])
+        lines.extend(f'{label}: {value}' for label,value in pairs)
+    lines.extend(['','[담당 업무]','업무 | 담당자 | 마감 | 중요도 | 상태'])
+    lines.extend(' | '.join(r) for r in rows) if rows else lines.append('등록된 담당 업무가 없습니다.')
+    return "\n".join(lines)
+
+
+def _report_font():
+    """한국어 TTF 우선, Colab 기본 환경에서는 PDF CID 글꼴 사용."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    candidates=("/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+                "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSansKR-Regular.ttf")
+    for name in candidates:
+        if Path(name).is_file():
+            if 'AbleKorean' not in pdfmetrics.getRegisteredFontNames():
+                pdfmetrics.registerFont(TTFont('AbleKorean',name))
+            return 'AbleKorean'
+    if 'HYSMyeongJo-Medium' not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(UnicodeCIDFont('HYSMyeongJo-Medium'))
+    return 'HYSMyeongJo-Medium'
+
+
+def meeting_report_pdf(title, meeting_date, analysis, tasks):
+    from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,LongTable,TableStyle,KeepTogether
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT
+    from xml.sax.saxutils import escape as xml_escape
+    font=_report_font();buf=io.BytesIO()
+    doc=SimpleDocTemplate(buf,pagesize=A4,rightMargin=37,leftMargin=37,topMargin=36,bottomMargin=37)
+    styles={
+      'title':ParagraphStyle('title',fontName=font,fontSize=18,leading=25,textColor=colors.HexColor('#252b52'),spaceAfter=18),
+      'section':ParagraphStyle('section',fontName=font,fontSize=12,leading=17,textColor=colors.HexColor('#4145a9'),spaceBefore=16,spaceAfter=8),
+      'cell':ParagraphStyle('cell',fontName=font,fontSize=9,leading=14,textColor=colors.HexColor('#27324c'),alignment=TA_LEFT,wordWrap='CJK'),
+      'header':ParagraphStyle('header',fontName=font,fontSize=9,leading=14,textColor=colors.HexColor('#ffffff')),
+    }
+    para=lambda v,style:Paragraph(xml_escape(str(v or '').replace('\n',' ')),styles[style])
+    story=[para(f'{title} | 회의록','title')]
+    sections,rows=meeting_report_data(title,meeting_date,analysis,tasks)
+    def append_table(headers, items, widths=None):
+        data=[[para(h,'header') for h in headers]]+[[para(cell,'cell') for cell in row] for row in items]
+        table=LongTable(data,colWidths=widths,repeatRows=1,hAlign='LEFT')
+        table.setStyle(TableStyle([
+          ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#514abe')),
+          ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,colors.HexColor('#f6f5ff')]),
+          ('VALIGN',(0,0),(-1,-1),'TOP'),('LINEBELOW',(0,0),(-1,-1),.4,colors.HexColor('#e1e5f1')),
+          ('LEFTPADDING',(0,0),(-1,-1),9),('RIGHTPADDING',(0,0),(-1,-1),9),
+          ('TOPPADDING',(0,0),(-1,-1),9),('BOTTOMPADDING',(0,0),(-1,-1),9),
+        ]))
+        story.append(table)
+    for heading,items in sections:
+        story.append(para(heading,'section'))
+        append_table(['항목','내용'],items,[115, A4[0]-74-115])
+    story.append(para('담당 업무','section'))
+    append_table(['업무','담당자','기한','중요도','상태'],rows or [('등록 업무 없음','-','-','-','-')],[185,68,111,68, A4[0]-74-185-68-111-68])
+    doc.build(story)
+    return buf.getvalue()
+
+
+def meeting_report_attachment(title, meeting_date, analysis, tasks, fmt):
+    if fmt == 'PDF 첨부':
+        return ('able_meeting_report.pdf',meeting_report_pdf(title,meeting_date,analysis,tasks),'application/pdf')
+    if fmt == 'TXT 첨부':
+        return ('able_meeting_report.txt',meeting_report_text(title,meeting_date,analysis,tasks).encode('utf-8-sig'),'text/plain')
+    return None
+
+
+def send_meeting_report(to, title, meeting_date, analysis, tasks, fmt='PDF 첨부'):
+    if fmt not in ('PDF 첨부','TXT 첨부','메일 본문 표'):
+        return {'status':'failed','error':'선택한 발송 형식을 확인하세요.'}
+    draft=analysis_mail(title,meeting_date,analysis,tasks)
+    attachment=meeting_report_attachment(title,meeting_date,analysis,tasks,fmt)
+    html_body=meeting_report_html(title,meeting_date,analysis,tasks) if fmt=='메일 본문 표' else None
+    return send_email(to,draft['subject'],draft['body'],attachment=attachment,html_body=html_body)
+
+
+def chat_meeting_mail_request(question):
+    """직접 발송을 요청한 문장만 처리. 메일/회의 원문에 있는 지시는 실행하지 않음."""
+    phrase=str(question).strip()
+    condensed=re.sub(r'\s+','',phrase).lower()
+    if not (('메일' in condensed or '이메일' in condensed) and
+            re.search(r'보내|발송',condensed) and
+            re.search(r'회의록|회의요약|회의내용|회의정리',condensed)):
+        return None
+    address_matches=re.findall(r'[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}',phrase)
+    if len(set(address_matches))>1:
+        return {'display_text':'받는 사람의 이메일 주소를 하나만 알려주세요. 아직 발송하지 않았어요.'}
+    if address_matches:
+        recipient=address_matches[0]
+    elif '나에게' in condensed or '내메일' in condensed or '내이메일' in condensed or '나한테' in condensed:
+        recipient=os.getenv('GMAIL_ADDRESS','').strip()
+    else:
+        return {'display_text':'회의록을 어느 주소로 보낼까요? “최근 회의록 PDF를 나에게 메일로 보내줘”처럼 말씀해 주세요. 아직 발송하지 않았어요.'}
+    if not valid_email(recipient):
+        return {'display_text':'수신자 이메일 주소를 확인해 주세요. 아직 발송하지 않았어요.'}
+    all_meetings=get_meetings()
+    pending=st.session_state.get('pending_analysis')
+    chosen=None
+    if pending and re.search(r'방금|지금|막|분석한|이회의',condensed):
+        chosen={'title':pending['title'],'meeting_date':pending['meeting_date'],'analysis':pending['analysis'],
+                'tasks':pending['analysis'].get('tasks') or []}
+    if chosen is None:
+        match=re.search(r'(?:회의록|회의)\s*#?\s*(\d+)',phrase)
+        if match:
+            requested_id=int(match.group(1))
+            found=next((m for m in all_meetings if m['id']==requested_id),None)
+        else:
+            matched=[m for m in all_meetings if m['title'] and m['title'] in phrase]
+            found=matched[0] if len(matched)==1 else (all_meetings[0] if all_meetings and (len(all_meetings)==1 or '최근' in phrase or '마지막' in phrase) else None)
+        if found is not None:
+            chosen={'title':found['title'],'meeting_date':found.get('meeting_date'),
+                    'analysis':get_meeting_analysis(found),
+                    'tasks':db_rows('SELECT * FROM tasks WHERE meeting_id=? ORDER BY id',(found['id'],))}
+    if chosen is None:
+        return {'display_text':'어느 회의록을 보낼지 확인이 필요해요. 회의 제목이나 번호를 알려주세요. 아직 발송하지 않았어요.'}
+    fmt='TXT 첨부' if 'txt' in condensed or '텍스트파일' in condensed else '메일 본문 표' if '본문' in condensed and '표' in condensed else 'PDF 첨부'
+    outcome=send_meeting_report(recipient,chosen['title'],chosen['meeting_date'],chosen['analysis'],chosen['tasks'],fmt)
+    if outcome['status']=='success':
+        result=f'“{chosen["title"]}” 회의록을 {fmt} 형식으로 {recipient}에 발송했어요.'
+    else:
+        result='메일을 보내지 못했어요. '+str(outcome.get('error','Gmail 설정을 확인해 주세요.'))
+    return {'display_text':result,'speech_text':make_speech_text(result)}
+
+
+def send_analysis_to_self(title, meeting_date, result, tasks, fmt="PDF 첨부"):
     """분석 화면의 발송 버튼을 눌렀을 때 본인 Gmail로 바로 전송합니다."""
     recipient = os.getenv("GMAIL_ADDRESS", "").strip()
     if not valid_email(recipient):
         return {"status":"failed", "error":"GMAIL_ADDRESS에 본인 Gmail 주소를 등록해 주세요."}
     mine = [task for task in tasks if normalize_person_name(task.get("assignee")) == normalize_person_name(st.session_state.my_name)]
     draft = analysis_mail(title, meeting_date, result, mine)
-    fingerprint = hashlib.sha256((recipient+"\0"+draft["subject"]+"\0"+draft["body"]).encode()).hexdigest()
+    fingerprint = hashlib.sha256((recipient+"\0"+draft["subject"]+"\0"+draft["body"]+"\0"+fmt).encode()).hexdigest()
     sent = st.session_state.get("analysis_self_sent", [])
     if fingerprint in sent:
         return {"status":"already_sent", "to":recipient}
-    outcome = send_email(recipient, draft["subject"], draft["body"])
+    outcome = send_meeting_report(recipient,title,meeting_date,result,mine,fmt)
     if outcome.get("status") == "success":
         st.session_state.analysis_self_sent = sent + [fingerprint]
     return {**outcome, "to":recipient}
@@ -1970,11 +2160,11 @@ def render_login():
 def render_floating_ai():
     image = asset_uri("idea")
     st.markdown(f'''<style>
-    .st-key-able_floating{{position:fixed!important;right:24px;bottom:24px;z-index:99990;width:82px!important}}
+    .st-key-able_floating{{position:fixed!important;right:24px;bottom:95px;z-index:99990;width:82px!important}}
     .st-key-able_floating [data-testid="stPopover"] button{{width:82px;height:82px;padding:0;border:2px solid #ebe5ff;border-radius:50%;background:#fff url("{image}") center/contain no-repeat;box-shadow:0 10px 32px #574c9d33}}
     .st-key-able_floating [data-testid="stPopover"] button p,.st-key-able_floating [data-testid="stPopover"] button svg{{opacity:0}}
     [data-testid="stPopoverBody"]:has(.st-key-floating_chat_panel){{width:410px;max-width:calc(100vw - 30px);padding:18px;border-radius:22px;box-shadow:0 18px 55px #4f438529}}
-    @media(max-width:640px){{.st-key-able_floating{{right:14px;bottom:14px}}}}
+    @media(max-width:640px){{.st-key-able_floating{{right:14px;bottom:88px}}}}
     </style>''',unsafe_allow_html=True)
     with st.container(key="able_floating"):
         with st.popover("에이블과 대화하기",help="에이블 빠른 대화 열기",key="floating_popover"):
@@ -1991,6 +2181,8 @@ def render_floating_ai():
                     question = st.text_input("에이블에게 질문",placeholder="예: 오늘 먼저 할 일은?",label_visibility="collapsed",key="floating_query")
                     send = st.form_submit_button("에이블에게 물어보기",type="primary",use_container_width=True)
                 if send and question.strip():
+                    with st.chat_message("user"):
+                        st.markdown(question)
                     with st.spinner("에이블이 생각하고 있어요…"):
                         process_able(question)
                     st.rerun()
@@ -2002,6 +2194,7 @@ def render_chat_message(message):
     avatar = str(BASE_DIR/"assets"/"able.png") if message["role"]=="assistant" else ":material/person:"
     with st.chat_message(message["role"],avatar=avatar):
         st.markdown(message["text"])
+
 
 
 # ============================================================
@@ -3092,10 +3285,21 @@ pending_registration이 있으면 사용자의 추가 설명을 반영해 제안
     return chat_action_reply(results) if results else {"display_text":"변경할 항목과 내용을 다시 알려주세요.","speech_text":"변경할 항목과 내용을 다시 알려주세요."}
 
 
+
 # ============================================================
 # 7. 로그인 후 공통 화면 초기화
 # ============================================================
 st.markdown(APP_CSS,unsafe_allow_html=True)
+st.markdown("""<style>
+/* 플로팅 대화창과 중복되는 사이드바 호출 패널은 숨기되, 호출 엔진은 유지 */
+.st-key-able_voice_engine{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;clip-path:inset(50%);pointer-events:none}
+.st-key-hero button,.st-key-hero button p,.home-briefing-player button{color:#332ba2!important;font-weight:800!important}
+.st-key-chat_mic_fixed{position:fixed!important;bottom:76px;left:max(295px,calc((100vw - 1100px)/2 + 35px));width:min(680px,calc(100vw - 390px));z-index:80;background:rgba(255,255,255,.97);border:1px solid #e8e7fb;border-radius:14px;padding:8px 12px;box-shadow:0 -6px 20px #30376915}
+@media(max-width:880px){.st-key-chat_mic_fixed{left:16px;width:calc(100vw - 120px);bottom:73px}}
+.st-key-card_assistant{padding-bottom:20px}
+.st-key-able_floating [data-testid=stPopover] button svg,[data-testid=stPopoverBody]:has(.st-key-floating_chat_panel)>div>button svg{display:none!important}
+.st-key-sidebar_logo_home button,.st-key-header_ai_shortcut button{font-weight:800!important;color:#5751bf!important}
+</style>""",unsafe_allow_html=True)
 activate_workspace()
 if not st.session_state.get("authenticated",False):
     render_login()
@@ -3175,7 +3379,8 @@ def handle_microphone_action():
 
 
 with st.sidebar:
-    st.markdown('<div class="brand"><span class="brand-logo">✦</span><div><b>AI WORK MATE</b><small>SMART WORK<br>ASSISTANT</small></div></div>',unsafe_allow_html=True)
+    if st.button("✦  AI WORK MATE",key="sidebar_logo_home",use_container_width=True,help="홈 대시보드로 이동"):
+        navigate("home")
     st.caption(st.session_state.my_name+"님의 업무 공간")
     order = st.session_state.sidebar_order
     pins = st.session_state.sidebar_pins
@@ -3214,12 +3419,12 @@ if "flash" in st.session_state:
     st.toast(st.session_state.pop("flash"),icon="✅")
 
 
+
 if page == "home":
     render_header("오늘의 업무 대시보드","WORKSPACE / OVERVIEW")
     pending = sorted([t for t in all_tasks if not t["done"]],key=task_sort_key)
     events = [e for e in all_events if e["event_date"]==today.isoformat()]
-    left,right = st.columns([2.2,1],gap="medium")
-    with left:
+    with st.container(key="home_briefing_full"):
         with st.container(key="hero"):
             st.markdown(f'<div class="hero-copy"><div class="hero-kicker">{today:%Y.%m.%d} · DAILY BRIEFING</div><h2>{esc(st.session_state.my_name)}님, 좋은 하루예요!<br>오늘 할 일을 함께 정리해 볼까요?</h2></div><img class="hero-robot" src="{asset_uri("work")}" alt="노트북으로 업무를 돕는 에이블"/>',unsafe_allow_html=True)
             st.markdown('<div class="hero-briefing">'+esc(briefing_text(all_tasks,all_events)).replace('\n','<br>')+'</div>',unsafe_allow_html=True)
@@ -3233,12 +3438,6 @@ if page == "home":
             HOME_BRIEFING_PLAYER(data={"text":speech,"rate":st.session_state.get("voice_speed",1.0)},key="home_read_briefing")
             if st.button("에이블과 대화하기 →",key="home_chat"):
                 navigate("chat")
-    with right:
-        with st.container(key="card_recommend"):
-            task = pending[0] if pending else None
-            st.markdown(f'<img class="recommend-robot" src="{asset_uri("idea")}" alt="추천하는 에이블"/><div class="recommend-label">AI 추천 우선 업무</div><div class="recommend-title">{esc(task["title"] if task else "새로운 업무를 등록해 보세요")}</div><div class="recommend-meta">{esc(task.get("due_date") or "기한 미정")+" · 중요도 "+esc(task["priority"])+" · "+str(priority_score(task))+"점" if task else "회의 분석이나 To-Do에서 업무를 추가할 수 있어요."}</div>',unsafe_allow_html=True)
-            if st.button("우선순위 확인 →",key="home_priority"):
-                navigate("todo")
     urgent = sum(bool(t.get("due_date")) and t["due_date"]<=(today+timedelta(days=1)).isoformat() for t in pending)
     stats = [("오늘 일정",len(events),"▦"),("전체 할 일",len(all_tasks),"☑"),("우선 처리",urgent,"✦"),("완료 업무",sum(bool(t["done"]) for t in all_tasks),"✓")]
     st.markdown('<div class="statrow">'+''.join(f'<div class="stat-card"><div><div class="stat-label">{label}</div><div class="stat-value">{value}</div></div><div class="stat-icon">{icon}</div></div>' for label,value,icon in stats)+'</div>',unsafe_allow_html=True)
@@ -3376,16 +3575,18 @@ elif page == "meeting":
                 if saved_id:
                     st.success(f"회의록 #{saved_id} 저장 완료 · 선택 항목을 추가하거나 수정한 뒤 다시 등록할 수 있어요.")
                     st.caption("기존 항목은 유지되며, 선택한 항목만 추가·수정합니다. 같은 항목은 중복 등록하지 않습니다.")
-                if st.button("✉ 회의 요약·내 담당 업무 나에게 보내기",key="meeting_self_"+analysis_id,use_container_width=True):
-                    with st.spinner("회의 요약과 내 담당 업무를 메일로 보내고 있어요…"):
-                        mail_result = send_analysis_to_self(pending["title"],pending["meeting_date"],result,tasks)
+                report_format=st.radio("회의록 이메일 발송 형식",["PDF 첨부","TXT 첨부","메일 본문 표"],horizontal=True,key="meeting_report_format_"+analysis_id)
+                if st.button("✉ 표로 정리한 회의록 나에게 보내기",key="meeting_self_"+analysis_id,use_container_width=True):
+                    with st.spinner("회의 요약표를 만들고 메일로 보내고 있어요…"):
+                        mail_result = send_analysis_to_self(pending["title"],pending["meeting_date"],result,tasks,report_format)
                     if mail_result["status"] == "success":
                         st.success(f"회의 요약과 내 담당 업무를 {mail_result['to']}로 발송했어요.")
                     elif mail_result["status"] == "already_sent":
                         st.info("같은 내용의 요약 메일은 이미 발송했어요.")
                     else:
                         st.error("이메일 발송 실패: "+mail_result.get("error","Gmail 설정을 확인해 주세요."))
-                st.caption("클릭하면 회의 요약과 선택한 내 담당 업무를 등록된 내 Gmail 주소로 바로 발송합니다.")
+                st.caption("화면의 회의 요약·결정 사항·업무표를 활용합니다. PDF/TXT 첨부 또는 HTML 표로 선택해 바로 발송해요.")
+
 
 
 elif page == "todo":
@@ -3508,6 +3709,7 @@ elif page == "calendar":
         st.markdown('<div class="note">회의에서 승인한 일정과 To-Do 마감일을 함께 보여줍니다. 항목을 클릭하면 상세 내용을 확인할 수 있어요.</div>',unsafe_allow_html=True)
 
 
+
 elif page == "chat":
     render_header("에이블과의 대화","WORKSPACE / ASSISTANT")
     left,right=st.columns([2.1,1],gap="medium")
@@ -3516,11 +3718,8 @@ elif page == "chat":
             st.markdown(f'<div class="chat-welcome"><img src="{robot_uri()}" alt="에이블"/><div><h2>안녕하세요, 저는 에이블이에요.</h2><p>‘에이블’이라고 부르거나 궁금한 내용을 입력해 주세요.<br>오늘의 업무와 회의 내용을 함께 정리해 드릴게요.</p></div></div>',unsafe_allow_html=True)
             for item in st.session_state.chat_history:
                 render_chat_message(item)
-            render_microphone_controls("chat_microphone")
-            prompt=st.chat_input("음성으로 말하거나 직접 입력해 주세요",key="able_chat_prompt")
-            if prompt:
-                with st.spinner("에이블이 답변하고 있어요…"):process_able(prompt,"text")
-                st.rerun()
+            # AI 응답 대기 중에도 사용자 메시지가 즉시 나타날 위치입니다.
+            chat_pending_slot=st.empty()
     with right:
         with st.container(key="card_chat_suggestions"):
             st.markdown('### ✦ 이런 질문을 해보세요')
@@ -3561,6 +3760,17 @@ elif page == "chat":
             if st.session_state.chat_history:
                 st.caption("음성이 자동으로 나오지 않으면, 브라우저의 소리 재생 허용을 확인하거나 아래에서 직접 재생해 주세요.")
                 render_speech_stop("chat_reply_replay")
+    # 메인 화면 최상위에 두어 Streamlit이 대화 입력창을 브라우저 하단에 고정합니다.
+    with st.container(key="chat_mic_fixed"):
+        render_microphone_controls("chat_microphone")
+    prompt=st.chat_input("음성으로 말하거나 직접 입력해 주세요",key="able_chat_prompt")
+    if prompt:
+        with chat_pending_slot.container():
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            with st.spinner("에이블이 답변하고 있어요…"):
+                process_able(prompt,"text")
+        st.rerun()
 
 
 elif page == "archive":
@@ -3595,8 +3805,13 @@ elif page == "archive":
                 c1,c2=st.columns(2)
                 content=analysis_mail(m["title"],m.get("meeting_date"),analysis,mine)["body"]+"\n\n[전체 스크립트]\n"+m["transcript"]
                 c1.download_button("회의록 다운로드",content,file_name=f"meeting_{m['id']}.txt",key=f"dl_{m['id']}")
-                if c2.button("요약·내 업무 나에게 보내기",key=f"mail_meeting_{m['id']}"):
-                    prepare_self_email(m["title"],m.get("meeting_date"),analysis,mine)
+                fmt=st.radio("이메일 형식",["PDF 첨부","TXT 첨부","메일 본문 표"],horizontal=True,key=f"archive_mail_format_{m['id']}")
+                if c2.button("요약표 나에게 바로 보내기",key=f"mail_meeting_{m['id']}"):
+                    with st.spinner("회의록 표를 이메일로 보내고 있어요…"):
+                        response=send_analysis_to_self(m["title"],m.get("meeting_date"),analysis,mine,fmt)
+                    if response.get("status")=="success":st.success("회의록을 내 이메일로 발송했어요.")
+                    elif response.get("status")=="already_sent":st.info("이미 동일한 형식의 회의록을 발송했어요.")
+                    else:st.error("메일 발송 실패: "+response.get("error","Gmail 설정을 확인하세요."))
                 with st.popover("회의록 삭제"):
                     linked_tasks=db_rows("SELECT COUNT(*) AS count FROM tasks WHERE meeting_id=?",(m["id"],))[0]["count"]
                     linked_events=db_rows("SELECT COUNT(*) AS count FROM events WHERE meeting_id=?",(m["id"],))[0]["count"]
@@ -3612,6 +3827,7 @@ elif page == "archive":
                             st.rerun()
                         except Exception as exc:st.error(str(exc))
         if not matches:st.markdown('<div class="empty">검색된 회의록이 없어요.</div>',unsafe_allow_html=True)
+
 
 
 elif page == "email":
@@ -3661,6 +3877,9 @@ elif page == "email":
                 contact_labels={c["id"]:f"{c['department']} {c['name']} {c['position']} ({c['email']})".strip() for c in contacts}
                 st.selectbox("주소록에서 검색·선택",list(contact_labels),index=None,format_func=lambda value:contact_labels.get(value, ""),placeholder="이름·부서·이메일로 검색하세요",key="email_contact",on_change=select_email_recipient)
                 if not contacts:st.caption("오른쪽 주소록에 연락처를 등록하면 이름을 입력하거나 목록에서 선택할 수 있어요.")
+                attach_report=st.checkbox("선택한 회의록의 요약표도 보내기",value=False,disabled=meeting is None,key="email_attach_report")
+                if attach_report:
+                    report_format=st.radio("회의록 형식",["PDF 첨부","TXT 첨부","메일 본문 표"],horizontal=True,key="email_report_format")
                 with st.form("send_email_form"):
                     to=st.text_input("이메일 주소",placeholder="직접 입력하거나 주소록에서 선택하세요",key="email_to")
                     subject=st.text_input("제목",key="email_subject")
@@ -3671,7 +3890,15 @@ elif page == "email":
                     if not agree:st.warning("내용을 확인한 뒤 동의에 체크해 주세요.")
                     else:
                         try:
-                            with st.spinner("이메일을 보내고 있어요…"):result=send_approved_email(to.strip(),subject.strip(),body.strip())
+                            if attach_report and meeting:
+                                meeting_analysis=get_meeting_analysis(meeting)
+                                meeting_tasks=db_rows("SELECT * FROM tasks WHERE meeting_id=?",(meeting["id"],))
+                                attachment=meeting_report_attachment(meeting["title"],meeting.get("meeting_date"),meeting_analysis,meeting_tasks,report_format)
+                                html_body=meeting_report_html(meeting["title"],meeting.get("meeting_date"),meeting_analysis,meeting_tasks) if report_format=="메일 본문 표" else None
+                                with st.spinner("회의록 요약표와 이메일을 발송하고 있어요…"):
+                                    result=send_approved_email(to.strip(),subject.strip(),body.strip(),attachment,html_body)
+                            else:
+                                with st.spinner("이메일을 보내고 있어요…"):result=send_approved_email(to.strip(),subject.strip(),body.strip())
                             if result["status"]=="success":st.success("이메일을 발송했어요.")
                             elif result["status"]=="already_sent":st.info("이 내용의 메일은 이미 발송했어요.")
                             else:st.error(result.get("error","발송하지 못했어요."))
@@ -3721,6 +3948,7 @@ elif page == "email":
                                         [(x["department"],x["name"],x["position"],x["email"]) for x in valid])
                                 st.session_state.flash=f"직원 {len(valid)}명의 연락처를 반영했어요.";st.rerun()
                     except Exception as exc:st.error(str(exc))
+
 
 
 elif page == "settings":
@@ -3812,3 +4040,4 @@ if queued_voice:
     st.session_state.clear_floating_query = True
     st.session_state._clear_voice_input = True
     st.rerun()
+
