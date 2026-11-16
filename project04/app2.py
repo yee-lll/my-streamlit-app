@@ -904,6 +904,15 @@ p,label,button{font-family:Inter,"Pretendard","Noto Sans KR","Apple SD Gothic Ne
 @media(max-width:1150px){.intro-art{--ghost-w:140px;height:162px;margin-right:0;}}
 @media(max-width:700px){.intro-art{display:none;}}
 
+
+
+
+/* Character shadow: visible outline plus a soft ground shadow. */
+.intro-art{position:relative;isolation:isolate;overflow:visible!important;}
+.intro-art .ghost-frame{position:relative;z-index:1;filter:drop-shadow(0 12px 12px rgba(24,49,53,.28))!important;}
+.intro-art::after{content:"";display:block;position:absolute;left:50%;bottom:3px;transform:translateX(-50%);width:92px;height:16px;border-radius:50%;background:radial-gradient(ellipse,rgba(31,67,69,.23) 0%,rgba(31,67,69,.11) 45%,rgba(31,67,69,0) 76%);filter:blur(3px);pointer-events:none;z-index:0;}
+@media(max-width:1150px){.intro-art .ghost-frame{filter:drop-shadow(0 10px 10px rgba(24,49,53,.25))!important;}.intro-art::after{width:79px;height:14px;bottom:2px;}}
+
 </style>''')
 
 
