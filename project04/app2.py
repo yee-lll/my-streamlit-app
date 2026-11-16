@@ -438,7 +438,7 @@ def load_document(state, data, name, config, directory, factory):
 # ====================================================================
 # 요청 분기·외부 자료·웹 검색
 # ====================================================================
-"""내부·등록 외부·웹·일반 대화 분기. 생성 요청은 최대 1회."""
+
 import concurrent.futures
 import datetime
 import ipaddress
@@ -712,90 +712,88 @@ def ui_heading(name, title):
 
 
 st.markdown('''<style>
-:root {--teal:#079e9b;--teal-dark:#087b7d;--ink:#101e30;--muted:#65778b;--line:#e2e9ee;--mint:#e5f7f5;}
-[data-testid="stAppViewContainer"] {background:#fbfdfe;color:var(--ink);}
-[data-testid="stHeader"] {background:transparent;height:2.5rem;}
-[data-testid="stMainBlockContainer"] {max-width:1360px;padding:3.3rem 3.4rem 2rem;}
-[data-testid="stMain"] {background:radial-gradient(ellipse at 95% 0%,#f0fbfa 0,transparent 33%),#fbfdfe;}
-h1,h2,h3,h4,p,label,button {font-family:Inter,"Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;}
-h1,h2,h3 {letter-spacing:-.055em;color:var(--ink);}
-[data-testid="stSidebar"] {background:#f3f7f9;border-right:1px solid #e8eef1;min-width:310px;max-width:340px;}
-[data-testid="stSidebarUserContent"] {padding:1.6rem 1.05rem 1.4rem;}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap:.65rem;}
-[data-testid="stSidebar"] .stElementContainer {min-width:0;}
-.sidebar-logo {padding:1px 23px 17px;}.sidebar-logo img{width:185px;height:auto;}
-.side-nav{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
-.side-nav a{display:flex;gap:12px;align-items:center;text-decoration:none!important;color:#25364a!important;font-size:15px;padding:11px 15px;border-radius:11px;}
-.side-nav a.active{background:#d5f1ef;color:#076b70!important;font-weight:750;}
-.side-nav a:hover{background:#e4f3f2;}
-[data-testid="stSidebar"] :is(.st-key-document_panel,.st-key-answer_settings,.st-key-document_status,.st-key-management_panel) {border:1px solid #e9eef1!important;border-radius:18px!important;background:#fff;box-shadow:0 3px 6px #173d4910;}
-.panel-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800;margin:0 0 7px;color:#112735;}
-.panel-title svg{color:#136972;flex:none;}
-[data-testid="stSidebar"] label p{font-size:13px;font-weight:550;color:#253544;}
-[data-testid="stSidebar"] [data-testid="stExpander"] {background:#f7fafb;border:1px solid #e4ecef;border-radius:11px;}
-[data-testid="stSidebar"] [data-testid="stExpander"] summary{font-size:13px;min-height:2.25rem;}
-[data-testid="stSidebar"] [data-testid="stFileUploader"] section{padding:10px;border-radius:10px;background:#edf7f7;}
+:root{--teal:#079e9b;--teal-dark:#087b7d;--ink:#101e30;--muted:#65778b;--line:#e2e9ee;--mint:#e5f7f5;}
+[data-testid="stAppViewContainer"]{background:#fbfdfe;color:var(--ink);}
+[data-testid="stHeader"]{background:transparent;height:2.5rem;}
+[data-testid="stMain"]{background:radial-gradient(ellipse at 95% 0%,#f0fbfa 0,transparent 36%),#fbfdfe;scroll-padding-bottom:120px;}
+[data-testid="stMainBlockContainer"]{max-width:1240px!important;padding:2.8rem 2.8rem 130px!important;}
+h1,h2,h3,h4,p,label,button{font-family:Inter,"Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;}
+[data-testid="stSidebar"]{background:#f3f7f9;border-right:1px solid #e8eef1;min-width:292px;max-width:316px;}
+[data-testid="stSidebarContent"]{padding:0 8px!important;}
+[data-testid="stSidebarHeader"]{height:28px!important;min-height:28px!important;padding:0 6px!important;}
+[data-testid="stLogoSpacer"]{height:0!important;}
+[data-testid="stSidebarUserContent"]{padding:0 8px 16px!important;}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:9px;}
+[data-testid="stSidebar"] .stElementContainer{min-width:0;}
+.sidebar-logo{padding:0 12px 8px;line-height:0;}.sidebar-logo img{width:166px;height:auto;}
+.side-nav{display:flex;flex-direction:column;gap:3px;margin:0 0 3px;}
+.side-nav a{display:flex;gap:11px;align-items:center;text-decoration:none!important;color:#25364a!important;font-size:14px;padding:8px 12px;border-radius:10px;line-height:1.45;}
+.side-nav a.active{background:#d5f1ef;color:#076b70!important;font-weight:750;}.side-nav a:hover{background:#e4f3f2;}
+[data-testid="stSidebar"] :is(.st-key-document_panel,.st-key-answer_settings,.st-key-document_status,.st-key-management_panel){border:1px solid #e6edef!important;border-radius:16px!important;background:#fff;box-shadow:0 3px 6px #173d490a;padding:12px!important;gap:8px!important;}
+.panel-title{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:800;margin:0 0 3px;color:#112735;line-height:1.5;}.panel-title svg{color:#136972;flex:none;width:20px;height:20px;}
+[data-testid="stSidebar"] label p{font-size:12px!important;font-weight:550;color:#253544;}
+[data-testid="stSidebar"] [data-testid="stExpander"]{background:#f8fbfc;border:1px solid #e4ecef;border-radius:9px;}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary{font-size:12px;min-height:30px;padding:5px 9px!important;}
+[data-testid="stSidebar"] [data-testid="stFileUploader"] section{padding:7px!important;border-radius:10px;background:#edf8f6;min-height:0;}
 [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"]{display:none;}
-[data-testid="stSidebar"] [data-testid="stFileUploader"] button{width:100%;font-size:13px;}
-[data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] {font-size:12px;}
-[data-testid="stSidebar"] [data-testid="stSelectbox"]>div>div{min-height:38px;border-radius:10px;background:#fff;border-color:#dbe5e9;}
-.stButton button,.stDownloadButton button{border:1px solid #d6e1e6;border-radius:11px;min-height:40px;font-weight:600;background:#fff;color:#17303d;box-shadow:0 2px 3px #173d4905;}
+[data-testid="stSidebar"] [data-testid="stFileUploader"] button{width:100%;font-size:12px;min-height:33px;}
+[data-testid="stSidebar"] [data-testid="stFileUploaderFile"]{font-size:11px;}
+[data-testid="stSidebar"] [data-testid="stSelectbox"]>div>div{min-height:34px!important;border-radius:9px;background:#fff;border-color:#dbe5e9;font-size:12px;}
+.stButton button,.stDownloadButton button{border:1px solid #d6e1e6;border-radius:10px;min-height:36px;font-weight:600;background:#fff;color:#17303d;box-shadow:0 2px 3px #173d4905;}
 .stButton button:hover,.stDownloadButton button:hover{border-color:#4dbcb5;color:#078482;background:#f3fbfa;}
-.stButton button[kind="primary"] {border:0;background:linear-gradient(115deg,#11acab,#039b98);color:white;box-shadow:0 3px 8px #079e9b1a;}
-.stButton button[kind="primary"]:hover{color:white;background:#078d8b;}
-.stButton button:disabled{opacity:.48;}
-[data-testid="stCheckbox"]>label {gap:.4rem;}
-.st-key-answer_settings [data-testid="stCheckbox"]>label {display:flex;flex-direction:row-reverse;justify-content:space-between;width:100%;}
-.st-key-answer_settings [data-testid="stCheckbox"]>label p {font-size:13px;}
-.st-key-answer_settings [data-testid="stCheckbox"]:has(input:checked) [data-baseweb="checkbox"]>div:first-child {background:var(--teal);}
-
-[data-testid="stCheckbox"] [data-checked="true"], [data-testid="stToggle"] [data-checked="true"]{background-color:var(--teal)!important;}
-.doc-card{display:flex;align-items:center;gap:10px;border:1px solid #e5ebef;background:#f6f9fb;border-radius:12px;padding:12px 10px;}
-.doc-icon{color:#f05454;}.doc-name{font-size:12px;font-weight:650;line-height:1.5;overflow-wrap:anywhere;}.doc-meta{font-size:11px;color:#788594;margin-top:3px;}.doc-check{margin-left:auto;color:#1ca372;}
-.status-card{display:flex;gap:10px;padding:13px 11px;border-radius:12px;background:#e3f7f4;}
-.status-card.waiting{background:#f0f5f8;}.status-dot{background:#20a16b;color:#fff;border-radius:50%;width:19px;height:19px;display:grid;place-items:center;flex:none;margin-top:2px;}.waiting .status-dot{background:#8aa1b0;}
-.status-title{font-size:14px;font-weight:750;margin-bottom:5px;}.status-copy{font-size:12px;line-height:1.6;color:#526775;}
-.hero{position:relative;padding:48px 14px 30px;min-height:330px;overflow:hidden;}
-.hero-copy{position:relative;z-index:1;max-width:72%;}.eyebrow{display:inline-block;background:linear-gradient(100deg,#80ded6,#72d5cd);border:1px solid #75d8d0;color:#fff;border-radius:30px;padding:4px 14px;font-size:14px;margin-bottom:14px;}
-.hero h1{font-size:clamp(33px,3.45vw,53px);font-weight:850;line-height:1.25;margin:0 0 18px;letter-spacing:-.06em;}
-.hero p{font-size:19px;color:#60778a;line-height:1.8;margin:0;letter-spacing:-.04em;}
-.hero-art{position:absolute;right:-2px;top:10px;width:31%;height:270px;}
-.feature-row{display:flex;gap:14px;position:relative;margin:24px 0 0;flex-wrap:wrap;}
-.feature-chip{display:flex;align-items:center;gap:10px;padding:13px 18px;border:1px solid #dcf0ef;border-radius:19px;background:#fcffff;box-shadow:0 3px 5px #137f8010;font-size:15px;font-weight:650;}
-.feature-chip svg{color:var(--teal);}
-.section-heading{font-size:25px;font-weight:800;letter-spacing:-.045em;margin:24px 0 19px;display:flex;gap:10px;align-items:center;}
-.section-heading .spark{color:#f4c451;font-size:29px;}
-.st-key-starter_area{margin-bottom:50px;}
-.st-key-starter_area .stButton button{min-height:76px;text-align:left;justify-content:flex-start;padding:14px 19px;border-radius:17px;background:linear-gradient(115deg,#fff,#f9fcfd);box-shadow:0 3px 5px #153d4910;border-color:#e0eaee;}
-.st-key-starter_area .stButton button p{font-size:16px;font-weight:650;letter-spacing:-.03em;}
-.st-key-starter_area .stButton button svg{color:var(--teal);width:25px;height:25px;}
-.compact-hero{padding:4px 8px 12px;}.compact-hero h1{font-size:31px;margin:0 0 8px;font-weight:850;}.compact-hero p{font-size:15px;color:#6c7c89;margin:0;}
-[data-testid="stChatMessage"] {background:transparent;gap:13px;padding:10px 0;margin-bottom:10px;align-items:flex-start;}
-[data-testid="stChatMessageContent"]{border:1px solid #e3e9ed;border-radius:17px;background:#fff;padding:20px 23px;box-shadow:0 3px 7px #1c48580a;min-width:0;}
-[data-testid="stChatMessageContent"] p,[data-testid="stChatMessageContent"] li{font-size:15px;line-height:1.8;color:#273544;}
+.stButton button[kind="primary"]{border:0;background:linear-gradient(115deg,#11acab,#039b98);color:white;box-shadow:0 3px 8px #079e9b1a;}
+.stButton button[kind="primary"]:hover{color:white;background:#078d8b;}.stButton button:disabled{opacity:.55;}
+.st-key-answer_settings [data-testid="stCheckbox"]>label{display:flex;flex-direction:row-reverse;justify-content:space-between;width:100%;gap:8px;min-height:25px;}
+.st-key-answer_settings [data-testid="stCheckbox"]>label>[data-testid="stWidgetLabel"]{margin:0!important;}
+.st-key-answer_settings label[data-selected="true"]>div:first-of-type{background:var(--teal)!important;}
+.st-key-answer_settings [data-testid="stCheckbox"]>label[data-selected="true"]>div:first-of-type>div{background:white!important;}
+.doc-card{display:flex;align-items:center;gap:9px;border:1px solid #e5ebef;background:#f6f9fb;border-radius:10px;padding:10px;}.doc-icon{color:#f05454;}.doc-name{font-size:12px;font-weight:650;line-height:1.5;overflow-wrap:anywhere;}.doc-meta{font-size:10px;color:#788594;margin-top:2px;}.doc-check{margin-left:auto;color:#1ca372;}
+.upload-copy{display:flex;align-items:center;gap:9px;font-size:12px;line-height:1.5;color:#536b78;}.upload-copy svg{color:var(--teal);flex:none;}
+.status-card{display:flex;gap:9px;padding:10px;border-radius:10px;background:#e3f7f4;}.status-card.waiting{background:#f0f5f8;}.status-dot{background:#20a16b;color:#fff;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;flex:none;margin-top:1px;}.waiting .status-dot{background:#8aa1b0;}.status-title{font-size:12px;font-weight:750;margin-bottom:3px;}.status-copy{font-size:11px;line-height:1.6;color:#526775;}
+.ui-api-note{font-size:11px;line-height:1.6;color:#856b2e;background:#fff7e7;border:1px solid #f0e3c6;border-radius:9px;padding:8px 10px;}
+.ui-note{font-size:10px;line-height:1.5;color:#8998a5;margin:2px 3px;}
+.hero{position:relative;box-sizing:border-box;padding:18px 8px 22px;min-height:275px;overflow:hidden;}
+.hero-copy{position:relative;z-index:1;max-width:72%;}
+.eyebrow{display:inline-block;background:linear-gradient(100deg,#80ded6,#72d5cd);border:1px solid #75d8d0;color:#fff;border-radius:30px;padding:3px 12px;font-size:12px;line-height:1.6;margin-bottom:12px;}
+.hero-title{font-size:clamp(32px,3vw,46px);font-weight:850;line-height:1.25;letter-spacing:-.055em;color:var(--ink);margin:0 0 14px;padding:0;}
+.hero-description{font-size:17px;color:#60778a;line-height:1.75;letter-spacing:-.035em;margin:0;padding:0;}
+.hero-art{position:absolute;right:0;top:0;width:29%;height:230px;pointer-events:none;}
+.feature-row{display:flex;gap:10px;position:relative;margin:21px 0 0;flex-wrap:wrap;}
+.feature-chip{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #dcf0ef;border-radius:16px;background:#fcffff;box-shadow:0 3px 5px #137f800a;font-size:13px;font-weight:650;line-height:1.5;}
+.feature-chip svg{color:var(--teal);width:21px;height:21px;}
+.section-heading{font-size:23px;font-weight:800;letter-spacing:-.045em;margin:10px 0 10px;display:flex;gap:9px;align-items:center;line-height:1.5;}.section-heading .spark{color:#f4c451;font-size:27px;}
+.st-key-starter_area{margin-bottom:10px!important;gap:12px!important;}
+.st-key-starter_area .stButton button{min-height:66px;text-align:left;justify-content:flex-start;padding:12px 16px;border-radius:15px;background:linear-gradient(115deg,#fff,#f9fcfd);box-shadow:0 3px 5px #153d490a;border-color:#e0eaee;}
+.st-key-starter_area .stButton button p{font-size:14px!important;font-weight:650;letter-spacing:-.03em;color:var(--ink)!important;}
+.st-key-starter_area .stButton button [data-testid="stIconMaterial"]{color:var(--teal)!important;font-size:23px;}
+.st-key-starter_area .stButton button:disabled{opacity:1!important;cursor:not-allowed;background:#fcfefe;border-color:#e4edef;}
+.st-key-starter_area .stButton button:disabled p{color:#526a76!important;}
+.st-key-starter_area [data-testid="stCaptionContainer"] p{font-size:11px;color:#7b8c98;line-height:1.5;}
+.compact-hero{padding:4px 0 16px;}.compact-title{font-size:29px;margin:0 0 7px;font-weight:850;line-height:1.35;letter-spacing:-.04em;}.compact-description{font-size:14px;color:#6c7c89;margin:0;line-height:1.6;}
+[data-testid="stChatMessage"]{background:transparent;gap:12px;padding:8px 0;margin-bottom:10px;align-items:flex-start;}
+[data-testid="stChatMessageContent"]{border:1px solid #e3e9ed;border-radius:16px;background:#fff;padding:17px 20px;box-shadow:0 3px 7px #1c48580a;min-width:0;}
+[data-testid="stChatMessageContent"] p,[data-testid="stChatMessageContent"] li{font-size:14px;line-height:1.8;color:#273544;}
 [data-testid="stChatMessageContent"] a{color:#079e9b;}
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]){flex-direction:row-reverse;margin-left:18%;}
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stChatMessageContent"]{background:#e1f6f3;border-color:#e1f6f3;box-shadow:none;flex-grow:0;}
 [data-testid="stChatMessageAvatarUser"]{background:#d9efec;color:#188581;}
-[data-testid="stChatMessageAvatarAssistant"]{background:linear-gradient(135deg,#17b8ae,#069c99);color:white;border-radius:50%;width:38px;height:38px;}
-[data-testid="stChatMessageAvatarAssistant"] svg{display:none;}
-[data-testid="stChatMessageAvatarAssistant"]:after{content:"";width:29px;height:29px;background:center/contain no-repeat url("__MARK_DATA_URI__");}
-[data-testid="stChatMessageContent"] [data-testid="stExpander"]{border:0;border-top:1px solid #e5eaed;border-radius:0;margin-top:14px;background:#fcfefe;}
+[data-testid="stChatMessageAvatarAssistant"]{background:linear-gradient(135deg,#17b8ae,#069c99);color:white;border-radius:50%;width:36px;height:36px;}
+[data-testid="stChatMessageAvatarAssistant"] [data-testid="stIconMaterial"],[data-testid="stChatMessageAvatarAssistant"] svg{display:none;}
+[data-testid="stChatMessageAvatarAssistant"]:after{content:"";width:28px;height:28px;background:center/contain no-repeat url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA2MCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik02IDQ2IDI0IDE1bDE5IDMxSDI2TTM4IDE1bDE4IDMxSDQ0Ii8+PC9nPjxjaXJjbGUgY3g9IjMyIiBjeT0iNyIgcj0iMyIgZmlsbD0id2hpdGUiLz48L3N2Zz4=");}
+[data-testid="stChatMessageContent"] [data-testid="stExpander"]{border:0;border-top:1px solid #e5eaed;border-radius:0;margin-top:12px;background:#fcfefe;}
 [data-testid="stChatMessageContent"] [data-testid="stExpander"] summary{color:#087f80;font-weight:650;}
 [data-testid="stBottom"]{background:transparent;}
-[data-testid="stBottomBlockContainer"]{max-width:1360px;padding:14px 3.4rem 24px;background:linear-gradient(0deg,#fbfdfe 80%,#fbfdfe00);}
-[data-testid="stChatInput"]{border:1px solid #d6e2e8;border-radius:17px;background:#fff;box-shadow:0 3px 6px #163e4c0b;padding:8px 10px;}
-[data-testid="stChatInput"] textarea{background:#fff!important;font-size:16px;padding:10px;color:#1b3140;}
-[data-testid="stChatInputSubmitButton"]{background:linear-gradient(125deg,#22bcb4,#059e9b);color:white;border-radius:12px;width:44px;height:43px;}
+[data-testid="stBottomBlockContainer"]{max-width:1240px!important;padding:9px 2.8rem 18px!important;background:linear-gradient(0deg,#fbfdfe 88%,#fbfdfe00);}
+[data-testid="stChatInput"]{border:1px solid #d6e2e8;border-radius:15px;background:#fff;box-shadow:0 3px 6px #163e4c0b;padding:6px 9px;min-height:58px;}
+[data-testid="stChatInput"] textarea{background:#fff!important;font-size:14px;padding:8px!important;color:#1b3140;line-height:1.6;}
+[data-testid="stChatInputSubmitButton"]{background:linear-gradient(125deg,#22bcb4,#059e9b);color:white;border-radius:11px;width:40px;height:39px;}
 [data-testid="stChatInputSubmitButton"]:hover{background:#078e8d;color:#fff;}
-[data-testid="stAlert"]{border-radius:12px;}
-.source-count{font-size:12px;color:#087e7c;margin-top:7px;}
-.ui-note{font-size:11px;line-height:1.6;color:#8998a5;margin:4px 3px;}
-.st-key-export_area .stDownloadButton button{font-size:12px;background:transparent;color:#71828d;}
-@media(min-width:1500px){[data-testid="stMainBlockContainer"]{padding-top:4rem;}.hero{min-height:365px;padding-top:55px;}.hero-art{height:300px;}.hero p{font-size:21px;}}
-@media(max-width:1100px){[data-testid="stMainBlockContainer"]{padding:3rem 1.5rem 1.5rem;}[data-testid="stBottomBlockContainer"]{padding:12px 1.5rem 20px;}.hero{padding:25px 0;min-height:300px;}.hero h1{font-size:35px;}.hero p{font-size:16px;}.hero-copy{max-width:76%;}.hero-art{width:26%;top:30px;height:190px;}.feature-chip{font-size:12px;padding:10px;gap:6px;}.feature-row{gap:8px;}.section-heading{font-size:22px;}.st-key-starter_area .stButton button p{font-size:14px;}}
-@media(max-width:700px){[data-testid="stMainBlockContainer"]{padding:3rem 1rem 1rem;}[data-testid="stBottomBlockContainer"]{padding:10px 1rem 16px;}.hero{padding-top:12px;min-height:0;}.hero-copy{max-width:100%;}.hero h1{font-size:32px;}.hero-art{display:none;}.hero p{font-size:15px;}.feature-row{margin-top:20px;}.feature-chip{font-size:11px;padding:9px;border-radius:12px;}.feature-chip svg{width:18px;}.section-heading{font-size:21px;margin-top:14px;}.st-key-starter_area [data-testid="stHorizontalBlock"]{flex-direction:column;}.st-key-starter_area [data-testid="stColumn"]{width:100%!important;flex:1 1 100%;}.st-key-starter_area .stButton button{min-height:64px;}.st-key-starter_area{margin-bottom:24px;}[data-testid="stChatMessageContent"]{padding:13px 15px;}[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]){margin-left:5%;}}
-</style>'''.replace('__MARK_DATA_URI__', 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA2MCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik02IDQ2IDI0IDE1bDE5IDMxSDI2TTM4IDE1bDE4IDMxSDQ0Ii8+PC9nPjxjaXJjbGUgY3g9IjMyIiBjeT0iNyIgcj0iMyIgZmlsbD0id2hpdGUiLz48L3N2Zz4='), unsafe_allow_html=True)
+[data-testid="stAlert"]{border-radius:10px;}
+.st-key-export_area .stDownloadButton button{font-size:11px;background:transparent;color:#71828d;}
+@media(max-height:820px) and (min-width:901px){[data-testid="stMainBlockContainer"]{padding-top:2rem!important;}.hero{min-height:225px;padding-top:8px;padding-bottom:16px;}.hero-title{font-size:39px;}.hero-description{font-size:15px;}.hero-art{height:200px;}.feature-row{margin-top:16px;}.feature-chip{padding:8px 11px;font-size:12px;}.section-heading{font-size:21px;margin-top:4px;}.st-key-starter_area .stButton button{min-height:59px;}.st-key-starter_area .stButton button p{font-size:13px!important;}[data-testid="stSidebar"] :is(.st-key-document_panel,.st-key-answer_settings,.st-key-document_status,.st-key-management_panel){padding:10px!important;gap:6px!important;}.side-nav a{padding:6px 11px;}}
+@media(max-width:1100px){[data-testid="stMainBlockContainer"]{padding:2.4rem 1.5rem 125px!important;}[data-testid="stBottomBlockContainer"]{padding:9px 1.5rem 16px!important;}.hero{padding:15px 0 20px;min-height:245px;}.hero-title{font-size:34px;}.hero-description{font-size:15px;}.hero-copy{max-width:77%;}.hero-art{width:25%;top:10px;height:180px;}.feature-chip{font-size:11px;padding:8px 10px;gap:6px;}.feature-row{gap:7px;}.section-heading{font-size:21px;}.st-key-starter_area .stButton button p{font-size:13px!important;}.st-key-starter_area .stButton button{padding:10px 12px;}}
+@media(max-width:700px){[data-testid="stMainBlockContainer"]{padding:2.6rem 1rem 130px!important;}[data-testid="stBottomBlockContainer"]{padding:8px 1rem 14px!important;}.hero{padding-top:8px;min-height:0;}.hero-copy{max-width:100%;}.hero-title{font-size:31px;}.hero-art{display:none;}.hero-description{font-size:14px;}.feature-row{margin-top:17px;}.feature-chip{font-size:10px;padding:8px;border-radius:12px;}.feature-chip svg{width:17px;}.section-heading{font-size:20px;margin-top:10px;}.st-key-starter_area [data-testid="stHorizontalBlock"]{flex-direction:column;gap:10px;}.st-key-starter_area [data-testid="stColumn"]{width:100%!important;flex:1 1 100%;}.st-key-starter_area .stButton button{min-height:57px;}.st-key-starter_area{margin-bottom:14px;}[data-testid="stChatMessageContent"]{padding:12px 14px;}[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]){margin-left:5%;}}
+</style>''', unsafe_allow_html=True)
 
 
 def settings():
@@ -868,8 +866,10 @@ with st.sidebar:
             st.markdown(f'''<div class="doc-card"><span class="doc-icon">{ui_icon('file',24)}</span>
                 <div><div class="doc-name">{safe_name}</div><div class="doc-meta">{upload_present.size/1024/1024:.1f} MB · PDF 백서</div></div>
                 <span class="doc-check">{ui_icon('check',18)}</span></div>''', unsafe_allow_html=True)
-        with st.expander('문서 교체' if upload_present is not None else 'PDF 백서 업로드',
-                         expanded=upload_present is None):
+        if upload_present is None:
+            st.markdown(f'<div class="upload-copy">{ui_icon("book",22)}<span>PDF 백서를 업로드해 주세요.<br>최대 20 MB · PDF 파일</span></div>', unsafe_allow_html=True)
+        upload_box = st.expander('문서 교체', expanded=False) if upload_present is not None else st.container()
+        with upload_box:
             uploaded = st.file_uploader('PDF 백서를 올려 주세요', type=['pdf'],
                                         key=f'upload_{st.session_state.upload_key}',
                                         on_change=clear_upload_state,
@@ -882,8 +882,6 @@ with st.sidebar:
         active = st.session_state.get('active_id')
         if active and active[1] != layout:
             invalidate(st.session_state)
-        if not configured:
-            st.info('관리자가 API 키와 답변 모델을 설정하면 사용할 수 있어요.')
         if st.button('문서 준비하기', type='primary', disabled=uploaded is None or not configured,
                      use_container_width=True):
             try:
@@ -913,13 +911,16 @@ with st.sidebar:
     ready = 'engine' in st.session_state
     with st.container(border=True, key='document_status'):
         ui_heading('chart', '현재 상태')
-        title = '문서 준비 완료' if ready else '문서를 준비해 주세요'
-        copy = ('업로드한 백서를 기반으로 답변할 수 있어요.' if ready else
-                'PDF 백서를 업로드하고 문서 준비하기를 눌러 주세요.')
-        st.markdown(f'''<div class="status-card {'' if ready else 'waiting'}">
-            <span class="status-dot">{ui_icon('check' if ready else 'file',13)}</span>
-            <div><div class="status-title">{title}</div><div class="status-copy">{copy}</div></div></div>''',
-            unsafe_allow_html=True)
+        if not configured:
+            st.markdown('<div class="ui-api-note"><strong>API 설정이 필요해요</strong><br>Streamlit 앱의 Secrets에 API 키를 설정하면 질문할 수 있어요.</div>', unsafe_allow_html=True)
+        else:
+            title = '문서 준비 완료' if ready else '문서를 준비해 주세요'
+            copy = ('업로드한 백서를 기반으로 답변할 수 있어요.' if ready else
+                    'PDF 백서를 업로드하고 문서 준비하기를 눌러 주세요.')
+            st.markdown(f'''<div class="status-card {'' if ready else 'waiting'}">
+                <span class="status-dot">{ui_icon('check' if ready else 'file',13)}</span>
+                <div><div class="status-title">{title}</div><div class="status-copy">{copy}</div></div></div>''',
+                unsafe_allow_html=True)
         if ready:
             st.caption(f'{st.session_state.document_name} · 검색 단위 {len(st.session_state.engine.chunks)}개')
     with st.container(border=True, key='management_panel'):
@@ -945,8 +946,8 @@ hero_slot = st.empty()
 with hero_slot.container():
     if not st.session_state.messages:
         st.markdown(f'''<section class="hero"><div class="hero-copy"><span class="eyebrow">AIVLE School</span>
-            <h1>AIVLE 학습 도우미</h1><p>AIVLE School 백서를 기반으로 학습, 프로젝트, 취업 등<br>
-            궁금한 내용을 쉽고 빠르게 확인해보세요.</p></div>
+            <div class="hero-title" role="heading" aria-level="1">AIVLE 학습 도우미</div><div class="hero-description">AIVLE School 백서를 기반으로 학습, 프로젝트, 취업 등<br>
+            궁금한 내용을 쉽고 빠르게 확인해보세요.</div></div>
             <div class="hero-art" aria-hidden="true"><svg viewBox="0 0 330 310" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
 <defs><linearGradient id="cover" x2="1" y2="1"><stop stop-color="#4ed4c7"/><stop offset="1" stop-color="#099d98"/></linearGradient><linearGradient id="edge"><stop stop-color="#0d9f9b"/><stop offset="1" stop-color="#45c7bb"/></linearGradient><filter id="shadow" x="-30%" y="-30%" width="180%" height="180%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#139e97" flood-opacity=".18"/></filter></defs>
 <path d="M33 188C-4 119 76 32 167 24s151 26 140 99-7 61 11 117-82 67-151 52S70 257 33 188Z" fill="#e8f9f6"/>
@@ -970,7 +971,7 @@ with hero_slot.container():
             <span class="feature-chip">{ui_icon('people',24)}선배 사례와 경험</span>
             <span class="feature-chip">{ui_icon('check',24)}학습 · 프로젝트 · 취업 정보</span></div></section>''', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="compact-hero"><h1>AIVLE 학습 도우미</h1><p>백서와 참고 자료를 바탕으로 궁금한 내용을 함께 찾아보세요.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="compact-hero"><div class="compact-title" role="heading" aria-level="1">AIVLE 학습 도우미</div><div class="compact-description">백서와 참고 자료를 바탕으로 궁금한 내용을 함께 찾아보세요.</div></div>', unsafe_allow_html=True)
 
 starter_prompt = None
 starter_slot = st.empty()
@@ -990,7 +991,9 @@ with starter_slot.container():
                         if st.button(q, icon=icon_name, key=f'starter_{start}_{icon_name}',
                                      disabled=not configured, use_container_width=True):
                             starter_prompt = q
-            if not ready:
+            if not configured:
+                st.caption('질문 기능은 API 설정 후 사용할 수 있어요. 설정은 Streamlit 앱의 Secrets에서 해주세요.')
+            elif not ready:
                 st.caption('백서 질문은 PDF 업로드 후 ‘문서 준비하기’를 눌러 주세요. 인사와 일반 대화는 바로 시작할 수 있어요.')
 
 st.markdown('<span id="chat-history"></span>', unsafe_allow_html=True)
@@ -1008,7 +1011,7 @@ prompt = prompt or starter_prompt
 if prompt:
     # 질문을 보내면 시작 화면만 접습니다. 아래의 기존 질문 처리 흐름은 유지합니다.
     starter_slot.empty()
-    hero_slot.markdown('<div class="compact-hero"><h1>AIVLE 학습 도우미</h1><p>백서와 참고 자료를 바탕으로 궁금한 내용을 함께 찾아보세요.</p></div>', unsafe_allow_html=True)
+    hero_slot.markdown('<div class="compact-hero"><div class="compact-title" role="heading" aria-level="1">AIVLE 학습 도우미</div><div class="compact-description">백서와 참고 자료를 바탕으로 궁금한 내용을 함께 찾아보세요.</div></div>', unsafe_allow_html=True)
     history = [{'role':m['role'], 'content':m['content']} for m in st.session_state.messages]
     st.session_state.messages.append({'role':'user','content':prompt})
     with st.chat_message('user'):
