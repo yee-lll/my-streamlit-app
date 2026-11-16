@@ -733,7 +733,7 @@ _UI_LOGO = 'iVBORw0KGgoAAAANSUhEUgAAAfgAAAByCAYAAAC/dMN1AAAQAElEQVR4Aey9B4AmR3km
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-_UI_ICONS = {'book': '<path d="M12 5v16" />\n  <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" />', 'file': '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />\n  <path d="M14 2v5a1 1 0 0 0 1 1h5" />\n  <path d="M10 9H8" />\n  <path d="M16 13H8" />\n  <path d="M16 17H8" />', 'settings': '<path d="M14 17H5" />\n  <path d="M19 7h-9" />\n  <circle cx="17" cy="17" r="3" />\n  <circle cx="7" cy="7" r="3" />', 'chart': '<path d="M5 21v-6" />\n  <path d="M12 21V3" />\n  <path d="M19 21V9" />', 'layers': '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />\n  <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />\n  <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />', 'cap': '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />\n  <path d="M22 10v6" />\n  <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" />', 'laptop': '<path d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z" />\n  <path d="M20.054 15.987H3.946" />', 'briefcase': '<path d="M12 12h.01" />\n  <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />\n  <path d="M22 13a18.15 18.15 0 0 1-20 0" />\n  <rect width="20" height="14" x="2" y="6" rx="2" />', 'people': '<path d="M18 21a8 8 0 0 0-16 0" />\n  <circle cx="10" cy="8" r="5" />\n  <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" />', 'home': '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />\n  <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />', 'clock': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />\n  <path d="M3 3v5h5" />\n  <path d="M12 7v5l4 2" />', 'check': '<path d="M20 6 9 17l-5-5" />', 'refresh': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />\n  <path d="M3 3v5h5" />', 'unlink': '<path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71" />\n  <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71" />\n  <line x1="8" x2="8" y1="2" y2="5" />\n  <line x1="2" x2="5" y1="8" y2="8" />\n  <line x1="16" x2="16" y1="19" y2="22" />\n  <line x1="19" x2="22" y1="16" y2="16" />', 'send': '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />\n  <path d="m21.854 2.147-10.94 10.939" />', 'chevron': '<path d="m9 18 6-6-6-6" />', 'chat': '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" />', 'sparkles': '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />\n  <path d="M20 2v4" />\n  <path d="M22 4h-4" />\n  <circle cx="4" cy="20" r="2" />'}
+_UI_ICONS = {'book': '<path d="M12 5v16" />\n  <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" />', 'file': '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />\n  <path d="M14 2v5a1 1 0 0 0 1 1h5" />\n  <path d="M10 9H8" />\n  <path d="M16 13H8" />\n  <path d="M16 17H8" />', 'settings': '<path d="M14 17H5" />\n  <path d="M19 7h-9" />\n  <circle cx="17" cy="17" r="3" />\n  <circle cx="7" cy="7" r="3" />', 'chart': '<path d="M5 21v-6" />\n  <path d="M12 21V3" />\n  <path d="M19 21V9" />', 'layers': '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />\n  <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />\n  <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />', 'cap': '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />\n  <path d="M22 10v6" />\n  <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" />', 'laptop': '<path d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z" />\n  <path d="M20.054 15.987H3.946" />', 'briefcase': '<path d="M12 12h.01" />\n  <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />\n  <path d="M22 13a18.15 18.15 0 0 1-20 0" />\n  <rect width="20" height="14" x="2" y="6" rx="2" />', 'people': '<path d="M18 21a8 8 0 0 0-16 0" />\n  <circle cx="10" cy="8" r="5" />\n  <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" />', 'home': '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />\n  <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />', 'clock': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />\n  <path d="M3 3v5h5" />\n  <path d="M12 7v5l4 2" />', 'check': '<path d="M20 6 9 17l-5-5" />', 'refresh': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />\n  <path d="M3 3v5h5" />', 'unlink': '<path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71" />\n  <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71" />\n  <line x1="8" x2="8" y1="2" y2="5" />\n  <line x1="2" x2="5" y1="8" y2="8" />\n  <line x1="16" x2="16" y1="19" y2="22" />\n  <line x1="19" x2="22" y1="16" y2="16" />', 'send': '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />\n  <path d="m21.854 2.147-10.94 10.939" />', 'chevron': '<path d="m9 18 6-6-6-6" />', 'chat': '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" />', 'sparkles': '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />\n  <path d="M20 2v4" />\n  <path d="M22 4h-4" />\n  <circle cx="4" cy="20" r="2" />', 'clipboard': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1" />\n  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />\n  <path d="m9 14 2 2 4-4" />'}
 
 
 def ui_icon(name, size=22, color='#079e9b'):
@@ -855,6 +855,38 @@ p,label,button{font-family:Inter,"Pretendard","Noto Sans KR","Apple SD Gothic Ne
 .source-summary .ui-icon{flex-shrink:0;}
 [data-testid="stChatInput"]>div{background:#fff!important;box-shadow:none!important;}
 [data-testid="stChatInput"] [data-baseweb="textarea"]{background:#fff!important;border:0!important;}
+
+/* First visit: a short introduction followed by four topic cards. */
+.intro-hero{position:relative;min-height:208px;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 20px 26px;margin:0 -4px 22px;border-bottom:1px solid #e8f0f1;background:linear-gradient(115deg,#f5fbfa,#fcfefe);border-radius:17px 17px 0 0;}
+.intro-copy{min-width:0;max-width:75%;}.intro-eyebrow{display:inline-block;padding:3px 11px;border-radius:20px;background:#8bd6d0;color:#fff;font-size:12px;line-height:1.6;margin-bottom:12px;}
+.intro-title{font-size:clamp(32px,3vw,43px);font-weight:800;line-height:1.3;letter-spacing:-.05em;color:#11212c;margin:0 0 13px;}
+.intro-description{font-size:16px;line-height:1.8;color:#617681;word-break:keep-all;margin:0;}
+.intro-art{width:154px;height:154px;border-radius:50%;background:#e4f6f2;display:flex;align-items:center;justify-content:center;flex:0 0 154px;margin-right:12px;}
+.intro-art .ui-icon{width:89px;height:89px;opacity:.8;}
+.landing-section-title{display:flex;align-items:center;gap:9px;font-size:21px;font-weight:750;color:#19313b;letter-spacing:-.03em;margin:0 0 18px;line-height:1.5;}
+.st-key-intro_cards [class*="st-key-topic_card_"]{background:linear-gradient(160deg,#fff,#f8fbfc);border:1px solid #e3ebef!important;border-radius:17px!important;padding:18px!important;gap:10px!important;box-shadow:0 3px 6px #183e4908;min-height:250px;flex-shrink:0!important;}
+.topic-card-heading{margin:0 0 5px;}
+.topic-card-icon{width:38px;height:38px;border-radius:11px;background:#e8f7f4;display:flex;align-items:center;justify-content:center;margin-bottom:13px;}
+.topic-card-icon .ui-icon{width:24px;height:24px;}
+.topic-card-name{font-size:18px;font-weight:750;color:#17313c;line-height:1.5;letter-spacing:-.03em;}
+.st-key-intro_cards .stButton button{border:0!important;box-shadow:none!important;background:transparent!important;min-height:37px;padding:8px 0!important;border-radius:7px;text-align:left;justify-content:flex-start;width:100%;}
+.st-key-intro_cards .stButton button>div{justify-content:flex-start!important;min-width:0;text-align:left;}
+.st-key-intro_cards .stButton button p{font-size:13px!important;font-weight:450!important;line-height:1.6!important;color:#405c6a;word-break:keep-all;text-align:left;}
+.st-key-intro_cards .stButton button:hover{background:#eaf7f3!important;}
+.st-key-intro_cards .stButton button:disabled{opacity:1!important;cursor:not-allowed;}
+.st-key-intro_cards .stButton button:disabled p{color:#6b8390!important;}
+.landing-note{font-size:11px;line-height:1.7;color:#8a9da6;margin:18px 0 0;}
+.ready-header{padding:7px 0 26px;}.ready-title{font-size:32px;font-weight:800;line-height:1.4;letter-spacing:-.04em;color:#11212c;margin:0 0 9px;}.ready-description{font-size:15px;line-height:1.7;color:#6e818c;margin:0;word-break:keep-all;}
+.st-key-ready_questions{gap:14px!important;}
+.st-key-ready_questions .stButton button{display:flex;align-items:center;justify-content:flex-start;gap:12px;min-height:74px;padding:16px!important;border-radius:15px;border:1px solid #e2ebee;background:#fbfefe;box-shadow:0 3px 6px #173d4908;text-align:left;}
+.st-key-ready_questions .stButton button>div{min-width:0;flex:1;justify-content:flex-start;text-align:left;}
+.st-key-ready_questions .stButton button p{font-size:14px!important;font-weight:550;line-height:1.6;word-break:keep-all;color:#35545f;}
+.st-key-ready_questions .stButton button:disabled{opacity:1!important;}
+.st-key-ready_questions .stButton button::before{content:"";display:block;width:25px;height:25px;flex:0 0 25px;background-position:center;background-repeat:no-repeat;background-size:25px;}
+.st-key-ready_questions .stButton button::after{content:"";display:block;width:15px;height:15px;flex:0 0 15px;background-position:center;background-repeat:no-repeat;background-size:15px;background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzg5MzlhIiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJtOSAxOCA2LTYtNi02IiAvPjwvc3ZnPg==");}
+.st-key-ready_intro button::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDc5ZTliIiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjEuNDIgMTAuOTIyYTEgMSAwIDAgMC0uMDE5LTEuODM4TDEyLjgzIDUuMThhMiAyIDAgMCAwLTEuNjYgMEwyLjYgOS4wOGExIDEgMCAwIDAgMCAxLjgzMmw4LjU3IDMuOTA4YTIgMiAwIDAgMCAxLjY2IDB6IiAvPgogIDxwYXRoIGQ9Ik0yMiAxMHY2IiAvPgogIDxwYXRoIGQ9Ik02IDEyLjVWMTZhNiAzIDAgMCAwIDEyIDB2LTMuNSIgLz48L3N2Zz4=");}.st-key-ready_project button::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDc5ZTliIiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTggNWEyIDIgMCAwIDEgMiAydjguNTI2YTIgMiAwIDAgMCAuMjEyLjg5N2wxLjA2OCAyLjEyN2ExIDEgMCAwIDEtLjkgMS40NUgzLjYyYTEgMSAwIDAgMS0uOS0xLjQ1bDEuMDY4LTIuMTI3QTIgMiAwIDAgMCA0IDE1LjUyNlY3YTIgMiAwIDAgMSAyLTJ6IiAvPgogIDxwYXRoIGQ9Ik0yMC4wNTQgMTUuOTg3SDMuOTQ2IiAvPjwvc3ZnPg==");}.st-key-ready_study button::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDc5ZTliIiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTggMjFhOCA4IDAgMCAwLTE2IDAiIC8+CiAgPGNpcmNsZSBjeD0iMTAiIGN5PSI4IiByPSI1IiAvPgogIDxwYXRoIGQ9Ik0yMiAyMGMwLTMuMzctMi02LjUtNC04YTUgNSAwIDAgMC0uNDUtOC4zIiAvPjwvc3ZnPg==");}.st-key-ready_career button::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDc5ZTliIiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgMTJoLjAxIiAvPgogIDxwYXRoIGQ9Ik0xNiA2VjRhMiAyIDAgMCAwLTItMmgtNGEyIDIgMCAwIDAtMiAydjIiIC8+CiAgPHBhdGggZD0iTTIyIDEzYTE4LjE1IDE4LjE1IDAgMCAxLTIwIDAiIC8+CiAgPHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjE0IiB4PSIyIiB5PSI2IiByeD0iMiIgLz48L3N2Zz4=");}
+@media(max-width:1150px){.intro-title{font-size:33px;}.intro-description{font-size:14px;}.intro-art{width:125px;height:125px;flex-basis:125px;margin:0;}.intro-art .ui-icon{width:73px;height:73px;}.intro-hero{padding:15px 16px 22px;min-height:195px;}.st-key-intro_cards>[data-testid="stLayoutWrapper"]>[data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}.st-key-intro_cards [data-testid="stColumn"]{width:100%!important;min-width:0!important;}.st-key-intro_cards [class*="st-key-topic_card_"]{min-height:235px;}}
+@media(max-width:700px){.intro-hero{min-height:0;padding:12px 9px 22px;gap:12px;margin-bottom:22px;}.intro-copy{max-width:100%;}.intro-art{display:none;}.intro-title{font-size:28px;}.intro-description{font-size:13px;}.intro-eyebrow{font-size:11px;}.landing-section-title{font-size:19px;margin-bottom:14px;}.st-key-intro_cards [class*="st-key-topic_card_"]{padding:14px!important;min-height:240px;}.topic-card-name{font-size:16px;}.st-key-intro_cards .stButton button p{font-size:11px!important;}.st-key-intro_cards .stButton button{min-height:38px;}.ready-title{font-size:27px;}.ready-description{font-size:13px;}.st-key-ready_questions>[data-testid="stLayoutWrapper"]>[data-testid="stHorizontalBlock"]{display:flex!important;flex-direction:column!important;gap:12px;}.st-key-ready_questions [data-testid="stColumn"]{width:100%!important;min-width:0!important;}.st-key-ready_questions .stButton button p{font-size:13px!important;}}
 
 </style>''')
 
@@ -998,31 +1030,110 @@ with st.sidebar:
                     st.rerun()
         st.html('<p class="ui-note">문서와 색인은 현재 세션에서 사용합니다.<br>서버 재시작 후에는 다시 준비해 주세요.</p>')
 
-# 아래 UI는 모두 기존 질문 처리 블록으로 연결됩니다.
-# 추천 질문도 별도 API/검색 경로를 만들지 않습니다.
-st.html(f"""<header class="home-header" id="learning-assistant">
-    <div class="home-brand">{ui_wordmark()}<span class="home-title" role="heading" aria-level="1">학습 도우미</span></div>
-    <p class="home-subtitle">백서 기반으로 학습 정보, 선배 후기, 프로젝트 팁을 빠르게 찾아보세요.</p>
-</header>""")
+# 아래 화면 함수들은 질문 문구를 기존 처리 블록으로 전달하는 UI입니다.
+def ui_render_chat_landing():
+    st.html(f"""<header class="home-header" id="learning-assistant">
+        <div class="home-brand">{ui_wordmark()}<span class="home-title" role="heading" aria-level="1">학습 도우미</span></div>
+        <p class="home-subtitle">백서 기반으로 학습 정보, 선배 후기, 프로젝트 팁을 빠르게 찾아보세요.</p>
+    </header>""")
 
-starter_prompt = None
-with st.container(key='starter_area'):
-    questions = [
-        ('에이블스쿨 장단점', '에이블스쿨의 장단점은 무엇인가요?', 'intro'),
-        ('빅프로젝트 주제 선정 팁', '빅프로젝트 주제 선정 팁을 알려주세요.', 'project'),
-        ('7~9기 선배 학습 전략', '7~9기 선배들의 학습 전략을 알려주세요.', 'study'),
-        ('잡페어 준비 팁', '잡페어는 어떻게 준비하면 좋을까요?', 'career'),
+    starter_prompt = None
+    with st.container(key='starter_area'):
+        questions = [
+            ('에이블스쿨 장단점', '에이블스쿨의 장단점은 무엇인가요?', 'intro'),
+            ('빅프로젝트 주제 선정 팁', '빅프로젝트 주제 선정 팁을 알려주세요.', 'project'),
+            ('7~9기 선배 학습 전략', '7~9기 선배들의 학습 전략을 알려주세요.', 'study'),
+            ('잡페어 준비 팁', '잡페어는 어떻게 준비하면 좋을까요?', 'career'),
+        ]
+        cols = st.columns(4, gap='small')
+        for col, (label, question, icon_name) in zip(cols, questions):
+            with col:
+                if st.button(label, key=f'question_{icon_name}',
+                             disabled=not configured, use_container_width=True):
+                    starter_prompt = question
+        if not configured:
+            st.caption('질문 기능은 API 설정 후 사용할 수 있어요.')
+        elif not ready:
+            st.caption('백서 질문은 왼쪽에서 PDF를 업로드하고 문서 준비하기를 눌러 주세요.')
+
+    return starter_prompt
+
+
+def ui_render_intro_landing():
+    st.html(f"""<section class="intro-hero" id="learning-assistant">
+        <div class="intro-copy"><span class="intro-eyebrow">AIVLE School</span>
+        <div class="intro-title" role="heading" aria-level="1">AIVLE 학습 도우미</div>
+        <p class="intro-description">에이블스쿨 백서를 기반으로 학습, 프로젝트, 취업까지<br>궁금한 내용을 빠르고 쉽게 찾아보세요.</p></div>
+        <div class="intro-art" aria-hidden="true">{ui_icon("clipboard",89)}</div>
+    </section>""")
+    st.html(f'<div class="landing-section-title">{ui_icon("sparkles",21)}<span>이런 질문을 해보세요!</span></div>')
+    starter_prompt = None
+    topics = [
+        ('intro', 'book', '에이블스쿨 소개', [
+            ('AIVLE School이란?', '에이블스쿨은 어떤 프로그램인가요?'),
+            ('장단점이 궁금해요', '에이블스쿨의 장단점은 무엇인가요?'),
+            ('추천하는 이유는?', '에이블스쿨을 추천하는 이유는 무엇인가요?'),
+        ]),
+        ('study', 'laptop', '학습 전략', [
+            ('어떻게 공부하나요?', '선배들은 에이블스쿨에서 어떻게 공부했나요?'),
+            ('기록은 어떻게 하나요?', '학습 내용을 기록하고 정리하는 방법을 알려주세요.'),
+            ('추천 학습법은?', '에이블스쿨 선배들이 추천하는 학습법을 알려주세요.'),
+        ]),
+        ('project', 'layers', '프로젝트', [
+            ('주제 선정 팁이 있나요?', '빅프로젝트 주제 선정 팁을 알려주세요.'),
+            ('추천 역할이 있나요?', '프로젝트 팀 역할은 어떻게 나누면 좋을까요?'),
+            ('협업 도구는 무엇인가요?', '프로젝트에서 사용한 협업 도구를 알려주세요.'),
+        ]),
+        ('career', 'briefcase', '취업·잡페어', [
+            ('취업 성공 사례가 있나요?', '에이블스쿨 선배들의 취업 성공 사례를 알려주세요.'),
+            ('취업 준비 팁이 궁금해요', '취업 준비 팁을 알려주세요.'),
+            ('잡페어는 어떻게 준비하나요?', '잡페어는 어떻게 준비하면 좋을까요?'),
+        ]),
     ]
-    cols = st.columns(4, gap='small')
-    for col, (label, question, icon_name) in zip(cols, questions):
-        with col:
-            if st.button(label, key=f'question_{icon_name}',
-                         disabled=not configured, use_container_width=True):
-                starter_prompt = question
-    if not configured:
-        st.caption('질문 기능은 API 설정 후 사용할 수 있어요.')
-    elif not ready:
-        st.caption('백서 질문은 왼쪽에서 PDF를 업로드하고 문서 준비하기를 눌러 주세요.')
+    with st.container(key='intro_cards'):
+        cols = st.columns(4, gap='medium')
+        for col, (key, icon_name, title, examples) in zip(cols, topics):
+            with col:
+                with st.container(border=True, key=f'topic_card_{key}'):
+                    st.html(f'<div class="topic-card-heading"><div class="topic-card-icon">{ui_icon(icon_name,24)}</div><div class="topic-card-name">{title}</div></div>')
+                    for number, (label, question) in enumerate(examples):
+                        if st.button(label, key=f'topic_{key}_{number}',
+                                     disabled=not configured, use_container_width=True):
+                            starter_prompt = question
+    st.html('<p class="landing-note">백서를 업로드하면 원문 근거와 함께 답변을 확인할 수 있어요.</p>')
+    return starter_prompt
+
+
+def ui_render_ready_landing():
+    st.html('<header class="ready-header" id="learning-assistant"><div class="ready-title" role="heading" aria-level="1">AIVLE 학습 도우미</div><p class="ready-description">업로드한 백서를 기반으로 궁금한 내용을 질문해보세요.</p></header>')
+    st.html(f'<div class="landing-section-title">{ui_icon("sparkles",21)}<span>많이 찾는 질문</span></div>')
+    questions = [
+        ('에이블스쿨 교육과정과 일정이 궁금해요.', '에이블스쿨의 교육과정과 일정을 알려주세요.', 'intro'),
+        ('선배들은 어떻게 공부했나요?', '선배들의 학습 전략을 알려주세요.', 'study'),
+        ('빅프로젝트 주제 선정 팁이 있을까요?', '빅프로젝트 주제 선정 팁을 알려주세요.', 'project'),
+        ('취업 준비는 어떻게 했나요?', '선배들은 취업 준비를 어떻게 했나요?', 'career'),
+    ]
+    starter_prompt = None
+    with st.container(key='ready_questions'):
+        for start in (0, 2):
+            cols = st.columns(2, gap='medium')
+            for col, (label, question, key) in zip(cols, questions[start:start+2]):
+                with col:
+                    if st.button(label, key=f'ready_{key}', disabled=not configured,
+                                 use_container_width=True):
+                        starter_prompt = question
+    return starter_prompt
+
+
+landing_kind = 'chat' if st.session_state.messages else ('ready' if ready else 'intro')
+landing_slot = st.empty()
+with landing_slot.container():
+    if landing_kind == 'intro':
+        starter_prompt = ui_render_intro_landing()
+    elif landing_kind == 'ready':
+        starter_prompt = ui_render_ready_landing()
+    else:
+        starter_prompt = ui_render_chat_landing()
 
 st.html('<span id="chat-history"></span>')
 for m in st.session_state.messages:
@@ -1037,6 +1148,10 @@ prompt = st.chat_input('궁금한 내용을 입력하세요.', disabled=not conf
                        max_chars=2000)
 prompt = prompt or starter_prompt
 if prompt:
+    if landing_kind != 'chat':
+        landing_slot.empty()
+        with landing_slot.container():
+            ui_render_chat_landing()
     history = [{'role':m['role'], 'content':m['content']} for m in st.session_state.messages]
     st.session_state.messages.append({'role':'user','content':prompt})
     with st.chat_message('user'):
@@ -1058,6 +1173,8 @@ if prompt:
             render_sources(message['sources'])
             st.caption(f'응답 시간 {message["elapsed_seconds"]:.1f}초')
             st.session_state.messages.append(message)
+            # 답변 저장 후 화면만 갱신하여 관리 버튼과 대화 상태를 동기화합니다.
+            st.rerun()
         except Exception:
             text = '답변을 생성하지 못했어요. API 연결이나 호출 한도를 확인한 뒤 다시 질문해 주세요.'
             st.error(text)
