@@ -1296,111 +1296,100 @@ UI_CSS = '''
 
 
 def ui_scroll_to_answer():
-    components.html(
-        '''
-        <script>
-        const d = window.parent.document;
+    import streamlit.components.v1 as components
 
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-            const rows = [
-                ...d.querySelectorAll('[data-testid="stChatMessage"]')
-            ];
+    components.html(f'''<!-- {uuid.uuid4().hex} -->
+    <script>
+    const d = window.parent.document;
 
-            const answers = rows.filter(
-                row => !row.querySelector(
-                    '[data-testid="stChatMessageAvatarUser"]'
-                )
-            );
+    requestAnimationFrame(() => requestAnimationFrame(() => {{
+        const rows = [
+            ...d.querySelectorAll('[data-testid="stChatMessage"]')
+        ];
 
-            const target = answers[answers.length - 1];
+        const answers = rows.filter(row =>
+            row.getClientRects().length &&
+            !row.querySelector('[data-testid="stChatMessageAvatarUser"]')
+        );
 
-            if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
-        }));
-        </script>
-        ''',
-        height=0,
-    )
+        const target = (
+            window.frameElement.closest('[data-testid="stChatMessage"]')
+            || answers[answers.length - 1]
+        );
+
+        const reduce = window.parent.matchMedia(
+            '(prefers-reduced-motion: reduce)'
+        ).matches;
+
+        if (target) {{
+            target.scrollIntoView({{
+                behavior: reduce ? 'auto' : 'smooth',
+                block: 'start'
+            }});
+        }}
+    }}));
+    </script>''', height=0)
+
 GHOST_LOADING_CSS = '''<style>
-.ghost-progress-panel {
+.ghost-loading-panel {
     padding:6px 12px 4px;
     border:1px solid #dcefeb;
-    border-radius:12px;
-    background:#f3fbf9;
+    border-radius:16px;
+    background:linear-gradient(110deg,#f6fcfb,#eaf8f5);
 }
-.ghost-progress-label {
+
+.ghost-loading-label {
+    color:#43827e;
     font-size:12px;
-    line-height:16px;
-    font-weight:600;
-    color:#28716e;
+    font-weight:500;
+    line-height:18px;
 }
-.ghost-progress-path {
+
+.ghost-loading-path {
     position:relative;
-    height:28px;
+    height:44px;
 }
-.ghost-progress-line {
+
+.ghost-loading-path::after {
+    content:"";
     position:absolute;
-    left:14px;
-    right:14px;
-    bottom:3px;
-    height:2px;
-    border-radius:2px;
-    background:#d4eae6;
-    overflow:hidden;
+    left:20px;
+    right:20px;
+    bottom:5px;
+    border-bottom:2px dashed #c7e7e1;
 }
-.ghost-progress-line i {
-    display:block;
-    height:100%;
-    width:var(--to-fill);
-    background:#27aba0;
-    animation:ghost-fill .35s ease-out both;
-}
-.ghost-progress-runner {
+
+.ghost-loading-character {
     position:absolute;
     top:0;
-    left:var(--to-position);
-    width:28px;
-    height:28px;
-    animation:ghost-advance .35s ease-out both;
+    left:var(--to);
+    z-index:1;
+    width:44px;
+    height:44px;
+    animation:ghost-forward .28s ease-out both;
 }
-.ghost-progress-runner .ghost-image {
+
+.ghost-loading-character .ghost-image {
     display:block;
-    width:28px;
-    height:28px;
+    width:44px;
+    height:44px;
     object-fit:contain;
-    filter:drop-shadow(0 2px 2px #237b781a);
+    filter:drop-shadow(0 3px 3px #237b781f);
     animation:none;
 }
-.ghost-progress-fallback {
-    font-size:24px;
-    line-height:28px;
+
+.ghost-loading-fallback {
+    font-size:36px;
+    line-height:44px;
 }
-.ghost-progress-ends {
-    display:flex;
-    justify-content:space-between;
-    font-size:10px;
-    line-height:10px;
-    color:#8aa6a1;
+
+@keyframes ghost-forward {
+    from { left:var(--from); }
+    to { left:var(--to); }
 }
-.ghost-progress-done .ghost-progress-runner,
-.ghost-progress-done .ghost-progress-line i {
-    animation:none;
-}
-@keyframes ghost-advance {
-    from { left:var(--from-position); }
-    to { left:var(--to-position); }
-}
-@keyframes ghost-fill {
-    from { width:var(--from-fill); }
-    to { width:var(--to-fill); }
-}
+
 @media(prefers-reduced-motion:reduce) {
-    .ghost-progress-runner,
-    .ghost-progress-line i {
+    .ghost-loading-character {
         animation:none;
     }
 }
@@ -1408,7 +1397,6 @@ GHOST_LOADING_CSS = '''<style>
 
 
 class GhostLoading:
-    # 처리 단계별 위치이며, 실제 완료 시에만 100에 도착합니다.
     STAGES = {
         '질문 분석': (8, 18, '질문을 살펴보고 있어요…'),
         '근거 찾기': (25, 40, '백서에서 근거를 찾고 있어요…'),
@@ -1421,42 +1409,41 @@ class GhostLoading:
         self.progress = 0
         self.animation = st.empty()
         self._render(0, label)
+
         self.details = st.expander(
             '처리 과정 자세히 보기',
             expanded=False,
         )
 
+        # 질문을 누르면 현재 로딩 위치로 이동
+        ui_scroll_to_answer()
+
     def _render(self, progress, label):
         previous = self.progress
-        self.progress = max(previous, progress)
+
+        # 이전 위치보다 뒤로 돌아가지 않도록 제한
+        self.progress = max(previous, min(progress, 100))
         p = self.progress
 
         ghost = (
             ui_ghost()
-            or '<span class="ghost-progress-fallback">👻</span>'
+            or '<span class="ghost-loading-fallback">👻</span>'
         )
-        done = ' ghost-progress-done' if p == 100 else ''
 
         self.animation.html(GHOST_LOADING_CSS + f'''
-            <div class="ghost-progress-panel{done}"
+            <div class="ghost-loading-panel"
                  style="
-                    --from-position:calc({previous}% - {28 * previous / 100}px);
-                    --to-position:calc({p}% - {28 * p / 100}px);
-                    --from-fill:{previous}%;
-                    --to-fill:{p}%;
+                    --from:calc({previous}% - {44 * previous / 100}px);
+                    --to:calc({p}% - {44 * p / 100}px);
                  ">
-                <div class="ghost-progress-label" role="status">
+                <div class="ghost-loading-label" role="status">
                     {esc(label)}
                 </div>
 
-                <div class="ghost-progress-path" aria-hidden="true">
-                    <div class="ghost-progress-line"><i></i></div>
-                    <div class="ghost-progress-runner">{ghost}</div>
-                </div>
-
-                <div class="ghost-progress-ends" aria-hidden="true">
-                    <span>0</span>
-                    <span>100</span>
+                <div class="ghost-loading-path" aria-hidden="true">
+                    <div class="ghost-loading-character">
+                        {ghost}
+                    </div>
                 </div>
             </div>
         ''')
@@ -1464,23 +1451,33 @@ class GhostLoading:
     def _stage(self, text, finished=False):
         for name, (start, end, label) in self.STAGES.items():
             if name in str(text):
-                self._render(end if finished else start, label)
+                self._render(
+                    end if finished else start,
+                    label,
+                )
                 return
 
     def update(self, label=None, state=None, expanded=None):
         if state == 'complete':
             self._render(100, '답변 준비 완료')
+
+            # 오른쪽 끝에 도착하는 동작 후 답변 표시
+            time.sleep(0.4)
+
         elif state == 'error':
             self._render(
                 self.progress,
                 '잠시 후 다시 시도해 주세요.',
             )
+
         elif label is not None:
             self._stage(label)
 
     def write(self, text):
         self._stage(text, finished=True)
         self.details.write(text)
+
+
 
 
 def render_page_navigation():
@@ -1707,4 +1704,6 @@ if ready and prompt:
     ask(prompt, use_graph, agentic)
 
 
-st.session_state.ui_scroll_answer = False
+if st.session_state.ui_scroll_answer and st.session_state.messages:
+    ui_scroll_to_answer()
+    st.session_state.ui_scroll_answer = False
