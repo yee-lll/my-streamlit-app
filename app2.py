@@ -1042,10 +1042,314 @@ def render_chat_header():
 # ----------------------------------------------------------------------------
 # 앱
 # ----------------------------------------------------------------------------
+import streamlit.components.v1 as components
+
+
+# 기존 관리자 기능은 그대로 사용하고 표시 위치만 변경
+_admin_main_content = admin_panel
+
+
+def admin_panel(configured):
+    with st.container(border=True, key='admin_navigation'):
+        ui_heading('admin_panel_settings', '관리자')
+
+        if st.button(
+            '관리자 페이지 열기',
+            key='open_admin',
+            width='stretch',
+        ):
+            st.session_state.ui_page = 'admin'
+            st.rerun()
+
+        if st.session_state.get('ui_page') == 'admin':
+            if st.button(
+                '학습 도우미로 돌아가기',
+                key='back_to_chat',
+                width='stretch',
+            ):
+                st.session_state.ui_page = 'chat'
+                st.rerun()
+
+
+def ui_queue_question(question):
+    st.session_state.pending = question
+    st.session_state.ui_page = 'chat'
+    st.rerun()
+
+
+def ui_hero():
+    st.html(f'''
+        <section class="intro-hero">
+            <div class="intro-copy">
+                <span class="intro-eyebrow">AIVLE School</span>
+                <div class="intro-title" role="heading" aria-level="1">
+                    {esc(cfg.APP_TITLE)}
+                </div>
+                <p class="intro-description">
+                    {esc(cfg.INTRO_DESCRIPTION)}
+                </p>
+            </div>
+            <div class="intro-art" aria-hidden="true">
+                {ui_ghost()}
+            </div>
+        </section>
+    ''')
+
+
+def ui_topic_cards(prefix):
+    with st.container(key=f'{prefix}_cards'):
+        columns = st.columns(4, gap='medium')
+
+        for col, (key, icon, title, questions) in zip(columns, TOPICS):
+            with col, st.container(
+                border=True,
+                key=f'topic_card_{prefix}_{key}',
+            ):
+                st.html(
+                    f'<div class="topic-card-icon">{mi(icon, 24)}</div>'
+                    f'<div class="topic-card-name">{esc(title)}</div>'
+                )
+
+                for i, question in enumerate(questions):
+                    if st.button(
+                        question,
+                        key=f'{prefix}_question_{key}_{i}',
+                        width='stretch',
+                    ):
+                        ui_queue_question(question)
+
+
+def render_intro(configured):
+    ui_hero()
+
+    st.html(
+        f'<div class="landing-section-title">{mi("auto_awesome", 21)}'
+        '<span>이런 질문을 해 보세요!</span></div>'
+    )
+
+    ui_topic_cards('intro')
+
+    st.caption(
+        '궁금한 질문을 먼저 눌러 보세요. '
+        '백서가 준비되지 않았다면 시작 방법을 안내해 드려요.'
+    )
+
+
+def render_ready():
+    # 문서 준비 후에도 첫 화면과 같은 소개 배너 사용
+    ui_hero()
+
+    st.html(
+        f'<div class="landing-section-title">{mi("auto_awesome", 21)}'
+        '<span>많이 찾는 질문</span></div>'
+    )
+
+    with st.container(key='ready_questions'):
+        for start in (0, 2):
+            columns = st.columns(2, gap='medium')
+
+            for col, (key, question) in zip(
+                columns,
+                READY_QUESTIONS[start:start + 2],
+            ):
+                if col.button(
+                    question,
+                    key=f'ready_{key}',
+                    icon=f':material/{TOPIC_ICON[key]}:',
+                    width='stretch',
+                ):
+                    ui_queue_question(question)
+
+    with st.expander('주제별 질문 더 보기'):
+        ui_topic_cards('more')
+
+
+UI_CSS = '''
+/* 사이드바 카드가 서로 겹치지 않도록 높이 유지 */
+.st-key-sidebar_stack > div {
+    flex-shrink: 0 !important;
+}
+
+.st-key-admin_navigation {
+    background: #fff;
+    border: 1px solid #e5ecef !important;
+    border-radius: 18px !important;
+    padding: 18px !important;
+}
+
+/* 펼친 질문도 첫 화면과 같은 카드 디자인 적용 */
+.st-key-more_cards [class*="st-key-topic_card_"] {
+    background: linear-gradient(160deg, #fff, #f8fbfc);
+    border: 1px solid #e3ebef !important;
+    border-radius: 17px !important;
+    padding: 18px !important;
+    gap: 10px !important;
+    box-shadow: 0 3px 6px #183e4908;
+    min-height: 250px;
+}
+
+.st-key-more_cards .stButton button {
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    min-height: 37px;
+    padding: 8px 0 !important;
+    justify-content: flex-start;
+}
+
+.st-key-more_cards .stButton button > div {
+    justify-content: flex-start !important;
+    text-align: left;
+}
+
+.st-key-more_cards .stButton button p {
+    font-size: 13px !important;
+    font-weight: 450 !important;
+    color: #405c6a;
+    word-break: keep-all;
+    text-align: left;
+}
+
+.st-key-more_cards .stButton button:hover {
+    background: #eaf7f3 !important;
+}
+
+/* 사용자 아이콘과 질문 말풍선을 가까이 배치 */
+[data-testid="stChatMessage"]:has(
+    [data-testid="stChatMessageAvatarUser"]
+) {
+    width: fit-content !important;
+    max-width: 88% !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    gap: 10px !important;
+    justify-content: flex-start !important;
+}
+
+[data-testid="stChatMessage"]:has(
+    [data-testid="stChatMessageAvatarUser"]
+) [data-testid="stChatMessageContent"] {
+    width: fit-content !important;
+    flex: 0 1 auto !important;
+}
+
+/* 입력창 양옆 배경 통일 */
+[data-testid="stBottom"],
+[data-testid="stBottomBlockContainer"] {
+    background: #fcfefe !important;
+}
+
+/* 오른쪽 메인 영역의 관리자 페이지 */
+:is([data-testid="stMain"], .stMain) .st-key-admin_panel {
+    width: 100%;
+    padding: 24px !important;
+    border-radius: 18px !important;
+    background: #fff;
+}
+
+/* 답변 평가 버튼 */
+[data-testid="stFeedback"] button,
+[data-testid="stButtonGroup"] button {
+    border-radius: 9px !important;
+}
+
+[data-testid="stFeedback"] button[aria-checked="true"],
+[data-testid="stButtonGroup"] button[aria-pressed="true"],
+[data-testid="stButtonGroup"] button[data-active="true"] {
+    background: #079e9b !important;
+    color: #fff !important;
+    border-color: #079e9b !important;
+}
+
+[data-testid="stFeedback"] button[aria-checked="true"] *,
+[data-testid="stButtonGroup"] button[aria-pressed="true"] *,
+[data-testid="stButtonGroup"] button[data-active="true"] * {
+    color: #fff !important;
+    fill: currentColor;
+}
+
+@media (max-width: 1150px) {
+    .st-key-more_cards [data-testid="stHorizontalBlock"] {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .st-key-more_cards [data-testid="stColumn"] {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}
+
+@media (max-width: 700px) {
+    :is([data-testid="stMain"], .stMain) .st-key-admin_panel {
+        padding: 16px !important;
+    }
+
+    [data-testid="stChatMessage"]:has(
+        [data-testid="stChatMessageAvatarUser"]
+    ) {
+        max-width: 95% !important;
+    }
+}
+'''
+
+
+def ui_scroll_to_answer():
+    components.html(
+        '''
+        <script>
+        const d = window.parent.document;
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            const rows = [
+                ...d.querySelectorAll('[data-testid="stChatMessage"]')
+            ];
+
+            const answers = rows.filter(
+                row => !row.querySelector(
+                    '[data-testid="stChatMessageAvatarUser"]'
+                )
+            );
+
+            const target = answers[answers.length - 1];
+
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        }));
+        </script>
+        ''',
+        height=0,
+    )
+
+
+# ----------------------------------------------------------------------------
+# 앱
+# ----------------------------------------------------------------------------
 configured = load_settings()
 init_state()
+
+st.session_state.setdefault('ui_page', 'chat')
+st.session_state.setdefault('ui_scroll_answer', False)
+
 inject_css()
+st.html('<style>' + UI_CSS + '</style>')
+
 ready, use_graph, agentic, show_sources = render_sidebar(configured)
+
+
+# 관리자는 오른쪽 메인 화면에서 로그인하고 관리
+if st.session_state.ui_page == 'admin':
+    st.title('관리자 페이지')
+    st.caption('설정 · 문서 색인 · 검색 추적 · 저장된 답변을 확인하세요.')
+
+    _admin_main_content(configured)
+    st.stop()
+
 
 if st.session_state.messages:
     render_chat_header()
@@ -1054,15 +1358,81 @@ elif ready:
 else:
     render_intro(configured)
 
-for i, message in enumerate(st.session_state.messages):
-    with st.chat_message(message['role'], avatar=AVATAR if message['role'] == 'assistant' else None):
-        st.markdown(message['content'])
-        if message['role'] == 'assistant':
-            render_assistant_extras(message, i == len(st.session_state.messages) - 1, show_sources)
 
-prompt = st.chat_input('에이블스쿨에 대해 궁금한 점을 물어보세요' if ready else '먼저 왼쪽에서 백서를 준비해 주세요',
-                       disabled=not ready, max_chars=1000)
-if ready and st.session_state.pending:
+for i, message in enumerate(st.session_state.messages):
+    with st.chat_message(
+        message['role'],
+        avatar=AVATAR if message['role'] == 'assistant' else None,
+    ):
+        st.markdown(message['content'])
+
+        if (
+            message['role'] == 'assistant'
+            and not message.get('ui_notice')
+        ):
+            render_assistant_extras(
+                message,
+                i == len(st.session_state.messages) - 1,
+                show_sources,
+            )
+
+
+prompt = st.chat_input(
+    '에이블스쿨에 대해 궁금한 점을 물어보세요'
+    if ready
+    else '먼저 왼쪽에서 백서를 준비해 주세요',
+    disabled=not ready,
+    max_chars=1000,
+)
+
+
+if st.session_state.pending:
     prompt, st.session_state.pending = st.session_state.pending, None
+    st.session_state.ui_scroll_answer = True
+
+    # 백서가 없을 때에는 API 호출 없이 채팅 안내 표시
+    if not ready:
+        if not configured:
+            notice = (
+                '먼저 관리자가 API 키를 설정해야 해요. '
+                '설정이 끝나면 왼쪽에서 백서를 준비해 주세요.'
+            )
+        elif default_pdf_available():
+            notice = (
+                f"먼저 왼쪽의 **'{cfg.DEFAULT_PDF_BUTTON}'**을 눌러 "
+                '기본 백서를 준비하거나, 내 백서 PDF를 등록해 주세요.'
+            )
+        else:
+            notice = (
+                '먼저 왼쪽 **내 백서**에서 PDF 백서를 등록해 주세요. '
+                '문서 준비가 끝나면 질문에 답변해 드릴게요.'
+            )
+
+        st.session_state.messages.extend([
+            {
+                'id': uuid.uuid4().hex,
+                'role': 'user',
+                'content': prompt,
+            },
+            {
+                'id': uuid.uuid4().hex,
+                'role': 'assistant',
+                'content': notice,
+                'ui_notice': True,
+            },
+        ])
+
+        st.rerun()
+
+
 if ready and prompt:
+    # 기존 검색·답변 함수 그대로 사용
     ask(prompt, use_graph, agentic)
+
+
+if (
+    st.session_state.ui_scroll_answer
+    and st.session_state.messages
+):
+    ui_scroll_to_answer()
+    st.session_state.ui_scroll_answer = False
