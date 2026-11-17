@@ -1617,7 +1617,6 @@ st.session_state.setdefault('ui_scroll_answer', False)
 inject_css()
 st.html('<style>' + UI_CSS + '</style>')
 
-ready, use_graph, agentic, show_sources = render_sidebar(configured)
 
 ready, use_graph, agentic, show_sources = render_sidebar(configured)
 render_page_navigation()
