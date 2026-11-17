@@ -1325,107 +1325,161 @@ def ui_scroll_to_answer():
         ''',
         height=0,
     )
-
-GHOST_LOADING_CSS = '''
-<style>
-.ghost-loading-track {
-    position: relative;
-    height: 88px;
-    overflow: hidden;
-    border: 1px solid #dcefeb;
-    border-radius: 16px;
-    background: linear-gradient(110deg, #f6fcfb, #eaf8f5);
+GHOST_LOADING_CSS = '''<style>
+.ghost-progress-panel {
+    padding:6px 12px 4px;
+    border:1px solid #dcefeb;
+    border-radius:12px;
+    background:#f3fbf9;
 }
-
-.ghost-loading-track::after {
-    content: "";
-    position: absolute;
-    left: 24px;
-    right: 24px;
-    bottom: 18px;
-    border-bottom: 2px dashed #c7e7e1;
+.ghost-progress-label {
+    font-size:12px;
+    line-height:16px;
+    font-weight:600;
+    color:#28716e;
 }
-
-.ghost-loading-runner {
-    position: absolute;
-    z-index: 1;
-    top: 6px;
-    left: 0;
-    width: 64px;
-    animation: ghost-travel 4.5s ease-in-out infinite alternate;
+.ghost-progress-path {
+    position:relative;
+    height:28px;
 }
-
-.ghost-loading-runner .ghost-image {
-    width: 64px;
-    height: 64px;
-    object-fit: contain;
-    filter: drop-shadow(0 6px 5px #237b7826);
-    animation: ghost-float 1.1s ease-in-out infinite alternate;
+.ghost-progress-line {
+    position:absolute;
+    left:14px;
+    right:14px;
+    bottom:3px;
+    height:2px;
+    border-radius:2px;
+    background:#d4eae6;
+    overflow:hidden;
 }
-
-.ghost-loading-fallback {
-    display: block;
-    font-size: 46px;
-    text-align: center;
+.ghost-progress-line i {
+    display:block;
+    height:100%;
+    width:var(--to-fill);
+    background:#27aba0;
+    animation:ghost-fill .35s ease-out both;
 }
-
-@keyframes ghost-travel {
-    from { left: 0; }
-    to   { left: calc(100% - 64px); }
+.ghost-progress-runner {
+    position:absolute;
+    top:0;
+    left:var(--to-position);
+    width:28px;
+    height:28px;
+    animation:ghost-advance .35s ease-out both;
 }
-
-@keyframes ghost-float {
-    from { transform: translateY(0); }
-    to   { transform: translateY(-5px); }
+.ghost-progress-runner .ghost-image {
+    display:block;
+    width:28px;
+    height:28px;
+    object-fit:contain;
+    filter:drop-shadow(0 2px 2px #237b781a);
+    animation:none;
 }
-
-@media (prefers-reduced-motion: reduce) {
-    .ghost-loading-runner,
-    .ghost-loading-runner .ghost-image {
-        animation: none;
+.ghost-progress-fallback {
+    font-size:24px;
+    line-height:28px;
+}
+.ghost-progress-ends {
+    display:flex;
+    justify-content:space-between;
+    font-size:10px;
+    line-height:10px;
+    color:#8aa6a1;
+}
+.ghost-progress-done .ghost-progress-runner,
+.ghost-progress-done .ghost-progress-line i {
+    animation:none;
+}
+@keyframes ghost-advance {
+    from { left:var(--from-position); }
+    to { left:var(--to-position); }
+}
+@keyframes ghost-fill {
+    from { width:var(--from-fill); }
+    to { width:var(--to-fill); }
+}
+@media(prefers-reduced-motion:reduce) {
+    .ghost-progress-runner,
+    .ghost-progress-line i {
+        animation:none;
     }
 }
-</style>
-'''
+</style>'''
 
 
 class GhostLoading:
-    """검색 처리는 유지하고 로딩 화면만 변경합니다."""
+    # 처리 단계별 위치이며, 실제 완료 시에만 100에 도착합니다.
+    STAGES = {
+        '질문 분석': (8, 18, '질문을 살펴보고 있어요…'),
+        '근거 찾기': (25, 40, '백서에서 근거를 찾고 있어요…'),
+        '근거 평가': (45, 55, '찾은 근거를 확인하고 있어요…'),
+        '다시 찾기': (60, 68, '필요한 근거를 더 찾고 있어요…'),
+        '답변 쓰기': (75, 94, '답변을 정리하고 있어요…'),
+    }
 
     def __init__(self, label):
+        self.progress = 0
         self.animation = st.empty()
-        self.label = st.empty()
-
-        ghost = (
-            ui_ghost()
-            or '<span class="ghost-loading-fallback">👻</span>'
-        )
-
-        self.animation.html(
-            GHOST_LOADING_CSS
-            + '<div class="ghost-loading-track" aria-hidden="true">'
-            + '<div class="ghost-loading-runner">'
-            + ghost
-            + '</div></div>'
-        )
-
-        self.label.caption(label)
-
+        self._render(0, label)
         self.details = st.expander(
             '처리 과정 자세히 보기',
             expanded=False,
         )
 
-    def update(self, label=None, state=None, expanded=None):
-        if label is not None:
-            self.label.caption(label)
+    def _render(self, progress, label):
+        previous = self.progress
+        self.progress = max(previous, progress)
+        p = self.progress
 
-        if state in ('complete', 'error'):
-            self.animation.empty()
-            self.label.empty()
+        ghost = (
+            ui_ghost()
+            or '<span class="ghost-progress-fallback">👻</span>'
+        )
+        done = ' ghost-progress-done' if p == 100 else ''
+
+        self.animation.html(GHOST_LOADING_CSS + f'''
+            <div class="ghost-progress-panel{done}"
+                 style="
+                    --from-position:calc({previous}% - {28 * previous / 100}px);
+                    --to-position:calc({p}% - {28 * p / 100}px);
+                    --from-fill:{previous}%;
+                    --to-fill:{p}%;
+                 ">
+                <div class="ghost-progress-label" role="status">
+                    {esc(label)}
+                </div>
+
+                <div class="ghost-progress-path" aria-hidden="true">
+                    <div class="ghost-progress-line"><i></i></div>
+                    <div class="ghost-progress-runner">{ghost}</div>
+                </div>
+
+                <div class="ghost-progress-ends" aria-hidden="true">
+                    <span>0</span>
+                    <span>100</span>
+                </div>
+            </div>
+        ''')
+
+    def _stage(self, text, finished=False):
+        for name, (start, end, label) in self.STAGES.items():
+            if name in str(text):
+                self._render(end if finished else start, label)
+                return
+
+    def update(self, label=None, state=None, expanded=None):
+        if state == 'complete':
+            self._render(100, '답변 준비 완료')
+        elif state == 'error':
+            self._render(
+                self.progress,
+                '잠시 후 다시 시도해 주세요.',
+            )
+        elif label is not None:
+            self._stage(label)
 
     def write(self, text):
-        self.label.caption(text)
+        self._stage(text, finished=True)
         self.details.write(text)
 # ----------------------------------------------------------------------------
 # 앱
