@@ -243,7 +243,17 @@ p,label,button,li{font-family:Inter,"Pretendard","Noto Sans KR","Apple SD Gothic
 
 
 def inject_css():
-    st.html('<style>' + CSS + '</style>')
+    st.html(
+        "<style>"
+        + CSS
+        + """
+        [data-stale="true"] {
+            opacity: 1 !important;
+            transition: none !important;
+        }
+        </style>
+        """
+    )
 
 
 # ----------------------------------------------------------------------------
@@ -1395,87 +1405,207 @@ GHOST_LOADING_CSS = '''<style>
 }
 </style>'''
 
-
 class GhostLoading:
-    STAGES = {
-        '질문 분석': (8, 18, '질문을 살펴보고 있어요…'),
-        '근거 찾기': (25, 40, '백서에서 근거를 찾고 있어요…'),
-        '근거 평가': (45, 55, '찾은 근거를 확인하고 있어요…'),
-        '다시 찾기': (60, 68, '필요한 근거를 더 찾고 있어요…'),
-        '답변 쓰기': (75, 94, '답변을 정리하고 있어요…'),
+    LABELS = {
+        '질문 분석': '질문을 살펴보고 있어요…',
+        '근거 찾기': '백서에서 근거를 찾고 있어요…',
+        '근거 평가': '찾은 근거를 확인하고 있어요…',
+        '다시 찾기': '필요한 근거를 더 찾고 있어요…',
+        '답변 쓰기': '답변을 정리하고 있어요…',
     }
 
     def __init__(self, label):
-        self.progress = 0
-        self.animation = st.empty()
-        self._render(0, label)
+        import uuid
+        from html import escape
+        import streamlit.components.v1 as components
 
+        self.uid = 'aivle-ghost-' + uuid.uuid4().hex
+        ghost = (
+            ui_ghost()
+            or '<span style="font-size:36px">👻</span>'
+        )
+
+        self.animation = st.empty()
+        self.animation.html(f'''
+        <style>
+        .aivle-gh-box {{
+            padding:6px 12px 4px;
+            border:1px solid #dcefeb;
+            border-radius:16px;
+            background:linear-gradient(110deg,#f6fcfb,#eaf8f5);
+        }}
+        .aivle-gh-label {{
+            font-size:12px;
+            line-height:18px;
+            color:#43827e;
+        }}
+        .aivle-gh-track {{
+            position:relative;
+            height:44px;
+        }}
+        .aivle-gh-track::after {{
+            content:"";
+            position:absolute;
+            left:20px;
+            right:20px;
+            bottom:5px;
+            border-bottom:2px dashed #c7e7e1;
+        }}
+        .aivle-gh-sprite {{
+            position:absolute;
+            left:0;
+            top:0;
+            width:44px;
+            height:44px;
+            z-index:1;
+            will-change:transform;
+            animation:none!important;
+        }}
+        .aivle-gh-sprite .ghost-image {{
+            display:block;
+            width:44px!important;
+            height:44px!important;
+            object-fit:contain;
+            animation:none!important;
+            filter:drop-shadow(0 3px 3px #237b781f);
+        }}
+        </style>
+
+        <div id="{self.uid}" class="aivle-gh-box">
+            <div class="aivle-gh-label" role="status">
+                {escape(str(label))}
+            </div>
+            <div class="aivle-gh-track" aria-hidden="true">
+                <div class="aivle-gh-sprite">{ghost}</div>
+            </div>
+        </div>
+        ''')
+
+        # 유령을 한 번 생성하고 움직임을 계속 유지합니다.
+        components.html(f'''<script>
+        (() => {{
+            const w = window.parent, d = w.document;
+            const deadline = w.performance.now() + 2000;
+
+            function start() {{
+                const box = d.getElementById('{self.uid}');
+
+                if (!box) {{
+                    if (w.performance.now() < deadline) {{
+                        w.requestAnimationFrame(start);
+                    }}
+                    return;
+                }}
+
+                const sprite = box.querySelector('.aivle-gh-sprite');
+                const track = box.querySelector('.aivle-gh-track');
+                const began = w.performance.now();
+
+                let p = 0;
+                let finishAt = null;
+                let finishFrom = 0;
+
+                box.closest('[data-testid="stChatMessage"]')
+                    ?.scrollIntoView({{
+                        behavior:'smooth',
+                        block:'start'
+                    }});
+
+                function move(now) {{
+                    if (!box.isConnected ||
+                        box.dataset.state === 'error') return;
+
+                    if (box.dataset.state === 'done') {{
+                        if (finishAt === null) {{
+                            finishAt = now;
+                            finishFrom = p;
+                        }}
+
+                        p = finishFrom + (1 - finishFrom)
+                            * Math.min(1, (now - finishAt) / 280);
+                    }} else {{
+                        const elapsed = now - began;
+                        p = 0.96 * elapsed / (elapsed + 16000);
+                    }}
+
+                    const distance = Math.max(
+                        0,
+                        track.clientWidth - sprite.offsetWidth
+                    );
+
+                    sprite.style.transform =
+                        'translateX(' + distance * p + 'px)';
+
+                    if (p < 1) w.requestAnimationFrame(move);
+                }}
+
+                w.requestAnimationFrame(move);
+            }}
+
+            start();
+        }})();
+        </script>''', height=0)
+
+        self.updates = st.empty()
         self.details = st.expander(
             '처리 과정 자세히 보기',
             expanded=False,
         )
 
-        # 질문을 누르면 현재 로딩 위치로 이동
-        ui_scroll_to_answer()
+    def _send(self, label, state='running'):
+        import json
+        import uuid
+        import streamlit.components.v1 as components
 
-    def _render(self, progress, label):
-        previous = self.progress
+        text = json.dumps(str(label)).replace('<', '\\u003c')
 
-        # 이전 위치보다 뒤로 돌아가지 않도록 제한
-        self.progress = max(previous, min(progress, 100))
-        p = self.progress
+        # 문구만 갱신합니다. 유령을 다시 생성하지 않습니다.
+        with self.updates:
+            components.html(f'''<!-- {uuid.uuid4().hex} -->
+            <script>
+            (() => {{
+                const box = window.parent.document.getElementById(
+                    '{self.uid}'
+                );
+                if (!box) return;
 
-        ghost = (
-            ui_ghost()
-            or '<span class="ghost-loading-fallback">👻</span>'
+                box.querySelector('.aivle-gh-label').textContent = {text};
+                box.dataset.state = '{state}';
+            }})();
+            </script>''', height=0)
+
+    def _label_for(self, text):
+        return next(
+            (
+                label
+                for name, label in self.LABELS.items()
+                if name in str(text)
+            ),
+            str(text),
         )
-
-        self.animation.html(GHOST_LOADING_CSS + f'''
-            <div class="ghost-loading-panel"
-                 style="
-                    --from:calc({previous}% - {44 * previous / 100}px);
-                    --to:calc({p}% - {44 * p / 100}px);
-                 ">
-                <div class="ghost-loading-label" role="status">
-                    {esc(label)}
-                </div>
-
-                <div class="ghost-loading-path" aria-hidden="true">
-                    <div class="ghost-loading-character">
-                        {ghost}
-                    </div>
-                </div>
-            </div>
-        ''')
-
-    def _stage(self, text, finished=False):
-        for name, (start, end, label) in self.STAGES.items():
-            if name in str(text):
-                self._render(
-                    end if finished else start,
-                    label,
-                )
-                return
 
     def update(self, label=None, state=None, expanded=None):
         if state == 'complete':
-            self._render(100, '답변 준비 완료')
+            import time
 
-            # 오른쪽 끝에 도착하는 동작 후 답변 표시
-            time.sleep(0.4)
+            self._send('답변 준비 완료', 'done')
+
+            # 오른쪽 끝에 도착한 후 기존 답변 표시로 이어집니다.
+            time.sleep(0.45)
 
         elif state == 'error':
-            self._render(
-                self.progress,
-                '잠시 후 다시 시도해 주세요.',
-            )
+            self._send('잠시 후 다시 시도해 주세요.', 'error')
 
         elif label is not None:
-            self._stage(label)
+            self._send(self._label_for(label))
 
     def write(self, text):
-        self._stage(text, finished=True)
+        self._send(self._label_for(text))
         self.details.write(text)
+
+
+
+
 
 
 
