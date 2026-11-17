@@ -771,7 +771,7 @@ def ask(question, use_graph, agentic):
 
 def run_chain(question, history, use_graph, agentic):
     with st.chat_message('assistant', avatar=AVATAR):
-        status = st.status('답변을 준비하고 있어요', expanded=True)
+        status = GhostLoading('백서에서 답변을 찾고 있어요…')
         ctx = get_script_run_ctx()
         main_thread = threading.current_thread()
 
@@ -1326,7 +1326,107 @@ def ui_scroll_to_answer():
         height=0,
     )
 
+GHOST_LOADING_CSS = '''
+<style>
+.ghost-loading-track {
+    position: relative;
+    height: 88px;
+    overflow: hidden;
+    border: 1px solid #dcefeb;
+    border-radius: 16px;
+    background: linear-gradient(110deg, #f6fcfb, #eaf8f5);
+}
 
+.ghost-loading-track::after {
+    content: "";
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    bottom: 18px;
+    border-bottom: 2px dashed #c7e7e1;
+}
+
+.ghost-loading-runner {
+    position: absolute;
+    z-index: 1;
+    top: 6px;
+    left: 0;
+    width: 64px;
+    animation: ghost-travel 4.5s ease-in-out infinite alternate;
+}
+
+.ghost-loading-runner .ghost-image {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 5px #237b7826);
+    animation: ghost-float 1.1s ease-in-out infinite alternate;
+}
+
+.ghost-loading-fallback {
+    display: block;
+    font-size: 46px;
+    text-align: center;
+}
+
+@keyframes ghost-travel {
+    from { left: 0; }
+    to   { left: calc(100% - 64px); }
+}
+
+@keyframes ghost-float {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ghost-loading-runner,
+    .ghost-loading-runner .ghost-image {
+        animation: none;
+    }
+}
+</style>
+'''
+
+
+class GhostLoading:
+    """검색 처리는 유지하고 로딩 화면만 변경합니다."""
+
+    def __init__(self, label):
+        self.animation = st.empty()
+        self.label = st.empty()
+
+        ghost = (
+            ui_ghost()
+            or '<span class="ghost-loading-fallback">👻</span>'
+        )
+
+        self.animation.html(
+            GHOST_LOADING_CSS
+            + '<div class="ghost-loading-track" aria-hidden="true">'
+            + '<div class="ghost-loading-runner">'
+            + ghost
+            + '</div></div>'
+        )
+
+        self.label.caption(label)
+
+        self.details = st.expander(
+            '처리 과정 자세히 보기',
+            expanded=False,
+        )
+
+    def update(self, label=None, state=None, expanded=None):
+        if label is not None:
+            self.label.caption(label)
+
+        if state in ('complete', 'error'):
+            self.animation.empty()
+            self.label.empty()
+
+    def write(self, text):
+        self.label.caption(text)
+        self.details.write(text)
 # ----------------------------------------------------------------------------
 # 앱
 # ----------------------------------------------------------------------------
@@ -1351,9 +1451,7 @@ if st.session_state.ui_page == 'admin':
     st.stop()
 
 
-if st.session_state.messages:
-    render_chat_header()
-elif ready:
+if ready:
     render_ready()
 else:
     render_intro(configured)
@@ -1430,9 +1528,4 @@ if ready and prompt:
     ask(prompt, use_graph, agentic)
 
 
-if (
-    st.session_state.ui_scroll_answer
-    and st.session_state.messages
-):
-    ui_scroll_to_answer()
-    st.session_state.ui_scroll_answer = False
+st.session_state.ui_scroll_answer = False
