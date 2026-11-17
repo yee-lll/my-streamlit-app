@@ -1481,6 +1481,130 @@ class GhostLoading:
     def write(self, text):
         self._stage(text, finished=True)
         self.details.write(text)
+
+
+def render_page_navigation():
+    import streamlit.components.v1 as components
+
+    components.html('''<script>
+    const w = window.parent, d = w.document;
+
+    let style = d.getElementById('aivle-page-navigation-style');
+    if (!style) {
+        style = d.createElement('style');
+        style.id = 'aivle-page-navigation-style';
+        d.head.appendChild(style);
+    }
+
+    style.textContent = `
+        body [data-testid="stMainBlockContainer"],
+        body [data-testid="stBottomBlockContainer"] {
+            padding-right:68px!important;
+        }
+
+        #aivle-page-navigation {
+            position:fixed;
+            right:12px;
+            bottom:calc(128px + env(safe-area-inset-bottom));
+            z-index:90;
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+            width:46px;
+            padding:5px;
+            box-sizing:border-box;
+            border:1px solid #d8ece8;
+            border-radius:24px;
+            background:rgba(255,255,255,.94);
+            box-shadow:0 4px 16px #185f5914;
+            backdrop-filter:blur(10px);
+        }
+
+        #aivle-page-navigation button {
+            display:grid;
+            place-items:center;
+            width:34px;
+            height:34px;
+            padding:0;
+            border:0;
+            border-radius:50%;
+            background:transparent;
+            color:#078e8a;
+            cursor:pointer;
+        }
+
+        #aivle-page-navigation button:hover {
+            background:#e1f5f0;
+        }
+
+        #aivle-page-navigation button:focus-visible {
+            outline:2px solid #21aaa0;
+            outline-offset:2px;
+        }
+
+        #aivle-page-navigation svg {
+            width:22px;
+            height:22px;
+            pointer-events:none;
+        }
+    `;
+
+    let nav = d.getElementById('aivle-page-navigation');
+
+    if (!nav) {
+        nav = d.createElement('nav');
+        nav.id = 'aivle-page-navigation';
+        nav.setAttribute('aria-label', '페이지 이동');
+
+        nav.innerHTML = `
+            <button type="button" data-dir="top"
+                    aria-label="맨 위로" title="맨 위로">
+                <svg viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="m6 14 6-6 6 6"/>
+                </svg>
+            </button>
+
+            <button type="button" data-dir="bottom"
+                    aria-label="맨 아래로" title="맨 아래로">
+                <svg viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="m6 10 6 6 6-6"/>
+                </svg>
+            </button>
+        `;
+
+        d.body.appendChild(nav);
+    }
+
+    nav.onclick = (event) => {
+        const button = event.target.closest('button[data-dir]');
+        if (!button) return;
+
+        const main = (
+            d.querySelector('[data-testid="stMain"], .stMain')
+            || d.scrollingElement
+        );
+
+        const top = (
+            button.dataset.dir === 'top'
+            ? 0
+            : main.scrollHeight
+        );
+
+        const behavior = (
+            w.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'auto'
+            : 'smooth'
+        );
+
+        main.scrollTo({top, behavior});
+    };
+    </script>''', height=0)
 # ----------------------------------------------------------------------------
 # 앱
 # ----------------------------------------------------------------------------
@@ -1495,6 +1619,8 @@ st.html('<style>' + UI_CSS + '</style>')
 
 ready, use_graph, agentic, show_sources = render_sidebar(configured)
 
+ready, use_graph, agentic, show_sources = render_sidebar(configured)
+render_page_navigation()
 
 # 관리자는 오른쪽 메인 화면에서 로그인하고 관리
 if st.session_state.ui_page == 'admin':
